@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NetworkTables, NetworkTablesTypeInfos } from "ntcore-ts-client";
-import { ntPathFromTableAndEntry, useSettings } from "@/lib/settings";
+import { useSettings } from "@/lib/settings";
 
 type StringTopicApi = {
   publish: () => Promise<void | unknown>;
   setValue: (value: string) => void;
   subscribe: (callback: (nextValue: string | null) => void) => number;
   unsubscribe: (subUid: number) => void;
-  publisher: boolean;
 };
+
+const REQUEST_TOPIC = "/Shared/PathPlanner/SelectedPath/Request";
+const STATE_TOPIC = "/Shared/PathPlanner/SelectedPath/State";
 
 export interface PathNetworkTableState {
   robotIp: string;
@@ -30,76 +32,178 @@ export function usePathNetworkTable(): PathNetworkTableState {
   const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
   const [lastPublishMs, setLastPublishMs] = useState<number | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
-  const topicRef = useRef<StringTopicApi | null>(null);
+
+  const requestTopicRef = useRef<StringTopicApi | null>(null);
+  const stateTopicRef = useRef<StringTopicApi | null>(null);
+  const publishPromiseRef = useRef<Promise<unknown> | null>(null);
+  const flushPromiseRef = useRef<Promise<void> | null>(null);
+  const isPublishedRef = useRef(false);
+  const queuedRequestRef = useRef<string | null>(null);
+  const wasConnectedRef = useRef(false);
 
   const robotIp = useMemo(
     () => settings.networkTables.host.trim(),
     [settings.networkTables.host],
   );
 
-  const topic = useMemo(
-    () =>
-      ntPathFromTableAndEntry(
-        settings.networkTables.sharedTable,
-        settings.networkTables.autonomousSelectedEntry,
-      ),
-    [
-      settings.networkTables.sharedTable,
-      settings.networkTables.autonomousSelectedEntry,
-    ],
-  );
+  const topic = STATE_TOPIC;
+
+  const normalizeAutoName = useCallback((autoName: string): string => {
+    const trimmed = autoName.trim();
+    return trimmed.length > 0 ? trimmed : "NONE";
+  }, []);
+
+  const ensureRequestPublished = useCallback(async () => {
+    const requestTopic = requestTopicRef.current;
+    if (!requestTopic) {
+      throw new Error("NetworkTables request topic is not ready.");
+    }
+    if (!isConnected) {
+      throw new Error("NetworkTables is not connected.");
+    }
+    if (isPublishedRef.current) return;
+
+    if (!publishPromiseRef.current) {
+      publishPromiseRef.current = (async () => {
+        await requestTopic.publish();
+        isPublishedRef.current = true;
+      })().catch((error) => {
+        publishPromiseRef.current = null;
+        isPublishedRef.current = false;
+        throw error;
+      });
+    }
+
+    await publishPromiseRef.current;
+  }, [isConnected]);
+
+  const flushQueuedRequest = useCallback(async () => {
+    if (flushPromiseRef.current) {
+      return flushPromiseRef.current;
+    }
+
+    const run = async () => {
+      while (queuedRequestRef.current !== null) {
+        const requestTopic = requestTopicRef.current;
+        if (!requestTopic) {
+          throw new Error("NetworkTables request topic is not ready.");
+        }
+
+        const valueToSend = queuedRequestRef.current;
+        await ensureRequestPublished();
+        requestTopic.setValue(valueToSend);
+        setPublishError(null);
+        setLastPublishMs(Date.now());
+
+        if (queuedRequestRef.current === valueToSend) {
+          queuedRequestRef.current = null;
+        }
+      }
+    };
+
+    flushPromiseRef.current = run().finally(() => {
+      flushPromiseRef.current = null;
+    });
+    return flushPromiseRef.current;
+  }, [ensureRequestPublished]);
 
   useEffect(() => {
     if (!robotIp) {
       setIsConnected(false);
+      requestTopicRef.current = null;
+      stateTopicRef.current = null;
+      publishPromiseRef.current = null;
+      flushPromiseRef.current = null;
+      isPublishedRef.current = false;
+      wasConnectedRef.current = false;
       return;
     }
+
     const nt = NetworkTables.getInstanceByURI(robotIp, settings.networkTables.port);
-    const selectedAutoTopic = nt.createTopic<string>(topic, NetworkTablesTypeInfos.kString, "NONE");
-    topicRef.current = selectedAutoTopic;
+    const requestTopic = nt.createTopic<string>(
+      REQUEST_TOPIC,
+      NetworkTablesTypeInfos.kString,
+      "NONE",
+    );
+    const stateTopic = nt.createTopic<string>(STATE_TOPIC, NetworkTablesTypeInfos.kString, "NONE");
+
+    requestTopicRef.current = requestTopic;
+    stateTopicRef.current = stateTopic;
+    publishPromiseRef.current = null;
+    flushPromiseRef.current = null;
+    isPublishedRef.current = false;
+    wasConnectedRef.current = false;
 
     const removeConnectionListener = nt.addRobotConnectionListener((connected) => {
       setIsConnected(connected);
+
+      if (!connected) {
+        publishPromiseRef.current = null;
+        flushPromiseRef.current = null;
+        isPublishedRef.current = false;
+      } else if (!wasConnectedRef.current && queuedRequestRef.current !== null) {
+        void flushQueuedRequest().catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          setPublishError(message);
+        });
+      }
+
+      wasConnectedRef.current = connected;
     }, true);
 
-    const subUid = selectedAutoTopic.subscribe((nextValue) => {
+    const subUid = stateTopic.subscribe((nextValue) => {
       if (typeof nextValue !== "string") return;
+
       const trimmed = nextValue.trim();
-      if (!trimmed || trimmed.toUpperCase() === "NONE") {
-        setSelectedAutoFromRobot(null);
-      } else {
-        setSelectedAutoFromRobot(trimmed);
-      }
+      setSelectedAutoFromRobot(!trimmed || trimmed.toUpperCase() === "NONE" ? null : trimmed);
       setLastUpdatedMs(Date.now());
     });
 
     return () => {
       removeConnectionListener();
-      selectedAutoTopic.unsubscribe(subUid);
-      topicRef.current = null;
+      stateTopic.unsubscribe(subUid);
+      requestTopicRef.current = null;
+      stateTopicRef.current = null;
+      publishPromiseRef.current = null;
+      flushPromiseRef.current = null;
+      isPublishedRef.current = false;
+      wasConnectedRef.current = false;
     };
-  }, [robotIp, settings.networkTables.port, topic]);
+  }, [robotIp, settings.networkTables.port, flushQueuedRequest]);
 
-  const publishSelectedAuto = useCallback(async (autoName: string) => {
-    const topicApi = topicRef.current;
-    if (!topicApi) {
-      throw new Error("NetworkTables topic is not ready.");
-    }
-
-    const nextValue = autoName.trim().length > 0 ? autoName.trim() : "NONE";
-    try {
-      if (!topicApi.publisher) {
-        await topicApi.publish();
+  const publishSelectedAuto = useCallback(
+    async (autoName: string) => {
+      if (!requestTopicRef.current) {
+        throw new Error("NetworkTables request topic is not ready.");
       }
-      topicApi.setValue(nextValue);
+
+      queuedRequestRef.current = normalizeAutoName(autoName);
       setPublishError(null);
-      setLastPublishMs(Date.now());
-    } catch (error) {
+
+      if (!isConnected) {
+        // Queue latest request while disconnected; it will be sent on next connect.
+        return;
+      }
+
+      try {
+        await flushQueuedRequest();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setPublishError(message);
+        throw error;
+      }
+    },
+    [flushQueuedRequest, isConnected, normalizeAutoName],
+  );
+
+  useEffect(() => {
+    if (!isConnected || queuedRequestRef.current === null) return;
+
+    void flushQueuedRequest().catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       setPublishError(message);
-      throw error;
-    }
-  }, []);
+    });
+  }, [flushQueuedRequest, isConnected]);
 
   return {
     robotIp,
