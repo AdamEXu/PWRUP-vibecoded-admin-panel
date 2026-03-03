@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  ntPathFromTableAndEntry,
+  ntSelectedPathTopics,
   useSettings,
 } from "@/lib/settings";
 import {
@@ -24,7 +24,7 @@ function SettingsContent() {
   const [ntHost, setNtHost] = useState<string>(settings.networkTables.host);
   const [ntPort, setNtPort] = useState<number>(settings.networkTables.port);
   const [sharedTable, setSharedTable] = useState<string>(settings.networkTables.sharedTable);
-  const [autonomousSelectedEntry, setAutonomousSelectedEntry] = useState<string>(settings.networkTables.autonomousSelectedEntry);
+  const [selectedPathTopic, setSelectedPathTopic] = useState<string>(settings.networkTables.selectedPathTopic);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -33,46 +33,56 @@ function SettingsContent() {
     setNtHost(settings.networkTables.host);
     setNtPort(settings.networkTables.port);
     setSharedTable(settings.networkTables.sharedTable);
-    setAutonomousSelectedEntry(settings.networkTables.autonomousSelectedEntry);
+    setSelectedPathTopic(settings.networkTables.selectedPathTopic);
   }, [
     settings.host,
-    settings.networkTables.autonomousSelectedEntry,
     settings.networkTables.host,
     settings.networkTables.port,
+    settings.networkTables.selectedPathTopic,
     settings.networkTables.sharedTable,
     settings.port,
   ]);
 
-  function onSave() {
-    const nextPort = Number(port);
-    const nextNtHost = ntHost.trim();
-    const nextNtPort = Number(ntPort);
-    const nextSharedTable = sharedTable.trim();
-    const nextAutonomousSelectedEntry = autonomousSelectedEntry.trim();
+  const nextHost = host.trim();
+  const nextPort = Number(port);
+  const nextNtHost = ntHost.trim();
+  const nextNtPort = Number(ntPort);
+  const nextSharedTable = sharedTable.trim();
+  const nextSelectedPathTopic = selectedPathTopic.trim();
+  const canSave =
+    nextHost.length > 0 &&
+    Number.isFinite(nextPort) &&
+    nextPort > 0 &&
+    nextPort <= 65535 &&
+    nextNtHost.length > 0 &&
+    Number.isFinite(nextNtPort) &&
+    nextNtPort > 0 &&
+    nextNtPort <= 65535 &&
+    nextSharedTable.length > 0 &&
+    nextSelectedPathTopic.length > 0;
+  const hasChanges =
+    nextHost !== settings.host ||
+    Math.round(nextPort) !== settings.port ||
+    nextNtHost !== settings.networkTables.host ||
+    Math.round(nextNtPort) !== settings.networkTables.port ||
+    nextSharedTable !== settings.networkTables.sharedTable ||
+    nextSelectedPathTopic !== settings.networkTables.selectedPathTopic;
+  const previewTopics = ntSelectedPathTopics(nextSharedTable, nextSelectedPathTopic);
 
-    if (
-      !host.trim() ||
-      !Number.isFinite(nextPort) ||
-      nextPort <= 0 ||
-      nextPort > 65535 ||
-      !nextNtHost ||
-      !Number.isFinite(nextNtPort) ||
-      nextNtPort <= 0 ||
-      nextNtPort > 65535 ||
-      !nextSharedTable ||
-      !nextAutonomousSelectedEntry
-    ) {
+  function onSave() {
+    if (!canSave) {
       setSaved(false);
       return;
     }
+
     setSettings({
-      host: host.trim(),
-      port: nextPort,
+      host: nextHost,
+      port: Math.round(nextPort),
       networkTables: {
         host: nextNtHost,
         port: Math.round(nextNtPort),
         sharedTable: nextSharedTable,
-        autonomousSelectedEntry: nextAutonomousSelectedEntry,
+        selectedPathTopic: nextSelectedPathTopic,
       },
     });
     setSaved(true);
@@ -86,6 +96,21 @@ function SettingsContent() {
 
   return (
     <div className="max-w-2xl space-y-6">
+      <div className="sticky top-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border border-white/10 bg-zinc-950/95 px-3 py-2 backdrop-blur">
+        <span className="text-sm text-zinc-400">
+          {hasChanges ? "Unsaved changes" : "All changes saved"}
+        </span>
+        <div className="flex items-center gap-3">
+          <Button onClick={onSave} disabled={!canSave || !hasChanges}>
+            Save changes
+          </Button>
+          <Button variant="outline" onClick={onReset}>
+            Reset defaults
+          </Button>
+          {saved && <span className="text-sm text-emerald-400">Saved</span>}
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Autobahn Connection</CardTitle>
@@ -118,15 +143,6 @@ function SettingsContent() {
               }}
             />
           </div>
-          <div className="flex items-center gap-3 pt-2">
-            <Button onClick={onSave}>Save</Button>
-            <Button variant="outline" onClick={onReset}>
-              Reset defaults
-            </Button>
-            {saved && (
-              <span className="text-sm text-emerald-400">Saved</span>
-            )}
-          </div>
         </CardContent>
       </Card>
 
@@ -134,7 +150,7 @@ function SettingsContent() {
         <CardHeader>
           <CardTitle>NetworkTables (Paths)</CardTitle>
           <CardDescription>
-            Path sync uses WPILib NT4 and connects to your configured robot host/IP.
+            Path sync uses WPILib NT4 and connects to your configured robot host/IP. No &quot;/Shared&quot; prefix is added automatically.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -163,24 +179,30 @@ function SettingsContent() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="nt-shared-table">Shared Table</Label>
+            <Label htmlFor="nt-shared-table">Dashboard-Robot Shared Table</Label>
             <Input
               id="nt-shared-table"
               type="text"
-              placeholder="PathPlanner"
+              placeholder="Shared/PathPlanner"
               value={sharedTable}
               onChange={(e) => setSharedTable(e.target.value)}
             />
+            <p className="text-xs text-zinc-500">
+              Examples: Shared/PathPlanner or PathPlanner.
+            </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="nt-selected-entry">Autonomous Selected Entry</Label>
+            <Label htmlFor="nt-selected-topic">Request Topic Base</Label>
             <Input
-              id="nt-selected-entry"
+              id="nt-selected-topic"
               type="text"
-              placeholder="AutonomousSelected"
-              value={autonomousSelectedEntry}
-              onChange={(e) => setAutonomousSelectedEntry(e.target.value)}
+              placeholder="SelectedPath"
+              value={selectedPathTopic}
+              onChange={(e) => setSelectedPathTopic(e.target.value)}
             />
+            <p className="text-xs text-zinc-500">
+              This is the request/state base. Do not include /Request or /State.
+            </p>
           </div>
           <div className="rounded-md border border-white/10 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
             NetworkTables target host:{" "}
@@ -188,9 +210,19 @@ function SettingsContent() {
               {ntHost || "(not set)"}
             </span>
             <br />
-            Full NT topic for selected auto:{" "}
+            Request topic (app to robot):{" "}
             <span className="font-mono text-zinc-100">
-              {ntPathFromTableAndEntry(sharedTable, autonomousSelectedEntry)}
+              {previewTopics.requestTopic}
+            </span>
+            <br />
+            State topic (robot to app):{" "}
+            <span className="font-mono text-zinc-100">
+              {previewTopics.stateTopic}
+            </span>
+            <br />
+            Robot-side constants style (no leading slash):{" "}
+            <span className="font-mono text-zinc-100">
+              {previewTopics.requestTopicWithoutLeadingSlash} / {previewTopics.stateTopicWithoutLeadingSlash}
             </span>
           </div>
         </CardContent>

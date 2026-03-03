@@ -13,7 +13,7 @@ export interface NetworkTablesSettings {
   host: string;
   port: number;
   sharedTable: string;
-  autonomousSelectedEntry: string;
+  selectedPathTopic: string;
 }
 
 export interface ConnectionSettings {
@@ -35,7 +35,7 @@ const DEFAULTS: ConnectionSettings = {
     host: "10.47.65.2",
     port: 5810,
     sharedTable: "PathPlanner",
-    autonomousSelectedEntry: "AutonomousSelected",
+    selectedPathTopic: "SelectedPath",
   },
 };
 const STORAGE_KEY = "blitz.settings.connection";
@@ -64,7 +64,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
     return {
       table: DEFAULTS.networkTables.sharedTable,
-      entry: DEFAULTS.networkTables.autonomousSelectedEntry,
+      entry: DEFAULTS.networkTables.selectedPathTopic,
     };
   }, []);
 
@@ -88,12 +88,22 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         : "",
       DEFAULTS.networkTables.sharedTable,
     );
+    const legacySelectedPathTopic =
+      typeof (parsed.networkTables as { autonomousSelectedEntry?: unknown } | undefined)?.autonomousSelectedEntry ===
+      "string"
+        ? ((parsed.networkTables as { autonomousSelectedEntry?: string }).autonomousSelectedEntry ?? "")
+        : "";
     let nextSelectedEntry = normalizeTopicPart(
-      typeof parsed.networkTables?.autonomousSelectedEntry === "string"
-        ? parsed.networkTables.autonomousSelectedEntry
-        : "",
-      DEFAULTS.networkTables.autonomousSelectedEntry,
+      typeof parsed.networkTables?.selectedPathTopic === "string"
+        ? parsed.networkTables.selectedPathTopic
+        : legacySelectedPathTopic,
+      DEFAULTS.networkTables.selectedPathTopic,
     );
+
+    // Migrate from the previous single-entry naming to request/state topic root.
+    if (nextSelectedEntry === "AutonomousSelected") {
+      nextSelectedEntry = DEFAULTS.networkTables.selectedPathTopic;
+    }
 
     // Backward compatibility with legacy `currentPathTopic` setting.
     const legacyTopicPath =
@@ -103,7 +113,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (legacyTopicPath.trim().length > 0) {
       const parsedLegacy = splitTopicPath(legacyTopicPath);
       nextSharedTable = normalizeTopicPart(parsedLegacy.table, DEFAULTS.networkTables.sharedTable);
-      nextSelectedEntry = normalizeTopicPart(parsedLegacy.entry, DEFAULTS.networkTables.autonomousSelectedEntry);
+      nextSelectedEntry = normalizeTopicPart(parsedLegacy.entry, DEFAULTS.networkTables.selectedPathTopic);
     }
 
     // Backward compatibility for previous team-number-derived NT host settings.
@@ -136,7 +146,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         host: migratedHostFromTeam,
         port: nextNtPort,
         sharedTable: nextSharedTable,
-        autonomousSelectedEntry: nextSelectedEntry,
+        selectedPathTopic: nextSelectedEntry,
       },
     };
   }, [normalizeTopicPart, splitTopicPath]);
@@ -228,7 +238,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             prev.networkTables.host === next.networkTables.host &&
             prev.networkTables.port === next.networkTables.port &&
             prev.networkTables.sharedTable === next.networkTables.sharedTable &&
-            prev.networkTables.autonomousSelectedEntry === next.networkTables.autonomousSelectedEntry
+            prev.networkTables.selectedPathTopic === next.networkTables.selectedPathTopic
           ) {
             return prev;
           }
@@ -279,4 +289,21 @@ export function ntPathFromTableAndEntry(table: string, entry: string): string {
   const normalizedTable = table.trim().replace(/^\/+|\/+$/g, "");
   const normalizedEntry = entry.trim().replace(/^\/+|\/+$/g, "");
   return `/${normalizedTable}/${normalizedEntry}`;
+}
+
+export function ntSelectedPathTopics(table: string, selectedPathTopic: string): {
+  requestTopic: string;
+  stateTopic: string;
+  requestTopicWithoutLeadingSlash: string;
+  stateTopicWithoutLeadingSlash: string;
+} {
+  const basePath = ntPathFromTableAndEntry(table, selectedPathTopic);
+  const basePathWithoutLeadingSlash = basePath.replace(/^\/+/, "");
+
+  return {
+    requestTopic: `${basePath}/Request`,
+    stateTopic: `${basePath}/State`,
+    requestTopicWithoutLeadingSlash: `${basePathWithoutLeadingSlash}/Request`,
+    stateTopicWithoutLeadingSlash: `${basePathWithoutLeadingSlash}/State`,
+  };
 }

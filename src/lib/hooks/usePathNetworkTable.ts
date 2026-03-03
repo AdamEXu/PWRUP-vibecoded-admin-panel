@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NetworkTables, NetworkTablesTypeInfos } from "ntcore-ts-client";
-import { useSettings } from "@/lib/settings";
+import { ntSelectedPathTopics, useSettings } from "@/lib/settings";
 
 type StringTopicApi = {
   publish: () => Promise<void | unknown>;
@@ -11,12 +11,11 @@ type StringTopicApi = {
   unsubscribe: (subUid: number) => void;
 };
 
-const REQUEST_TOPIC = "/Shared/PathPlanner/SelectedPath/Request";
-const STATE_TOPIC = "/Shared/PathPlanner/SelectedPath/State";
-
 export interface PathNetworkTableState {
   robotIp: string;
   topic: string;
+  requestTopic: string;
+  stateTopic: string;
   isConnected: boolean;
   selectedAutoFromRobot: string | null;
   lastUpdatedMs: number | null;
@@ -46,7 +45,15 @@ export function usePathNetworkTable(): PathNetworkTableState {
     [settings.networkTables.host],
   );
 
-  const topic = STATE_TOPIC;
+  const { requestTopic: requestTopicPath, stateTopic: stateTopicPath } = useMemo(
+    () =>
+      ntSelectedPathTopics(
+        settings.networkTables.sharedTable,
+        settings.networkTables.selectedPathTopic,
+      ),
+    [settings.networkTables.selectedPathTopic, settings.networkTables.sharedTable],
+  );
+  const topic = stateTopicPath;
 
   const normalizeAutoName = useCallback((autoName: string): string => {
     const trimmed = autoName.trim();
@@ -110,6 +117,8 @@ export function usePathNetworkTable(): PathNetworkTableState {
   useEffect(() => {
     if (!robotIp) {
       setIsConnected(false);
+      setSelectedAutoFromRobot(null);
+      setLastUpdatedMs(Date.now());
       requestTopicRef.current = null;
       stateTopicRef.current = null;
       publishPromiseRef.current = null;
@@ -121,11 +130,11 @@ export function usePathNetworkTable(): PathNetworkTableState {
 
     const nt = NetworkTables.getInstanceByURI(robotIp, settings.networkTables.port);
     const requestTopic = nt.createTopic<string>(
-      REQUEST_TOPIC,
+      requestTopicPath,
       NetworkTablesTypeInfos.kString,
       "NONE",
     );
-    const stateTopic = nt.createTopic<string>(STATE_TOPIC, NetworkTablesTypeInfos.kString, "NONE");
+    const stateTopic = nt.createTopic<string>(stateTopicPath, NetworkTablesTypeInfos.kString, "NONE");
 
     requestTopicRef.current = requestTopic;
     stateTopicRef.current = stateTopic;
@@ -138,6 +147,8 @@ export function usePathNetworkTable(): PathNetworkTableState {
       setIsConnected(connected);
 
       if (!connected) {
+        setSelectedAutoFromRobot(null);
+        setLastUpdatedMs(Date.now());
         publishPromiseRef.current = null;
         flushPromiseRef.current = null;
         isPublishedRef.current = false;
@@ -169,7 +180,7 @@ export function usePathNetworkTable(): PathNetworkTableState {
       isPublishedRef.current = false;
       wasConnectedRef.current = false;
     };
-  }, [robotIp, settings.networkTables.port, flushQueuedRequest]);
+  }, [flushQueuedRequest, requestTopicPath, robotIp, settings.networkTables.port, stateTopicPath]);
 
   const publishSelectedAuto = useCallback(
     async (autoName: string) => {
@@ -208,6 +219,8 @@ export function usePathNetworkTable(): PathNetworkTableState {
   return {
     robotIp,
     topic,
+    requestTopic: requestTopicPath,
+    stateTopic: stateTopicPath,
     isConnected,
     selectedAutoFromRobot,
     lastUpdatedMs,
