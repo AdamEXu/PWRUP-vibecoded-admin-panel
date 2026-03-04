@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - electron
+  - electron-winstaller
+  - protobufjs
+  - sharp
+  - unrs-resolver
