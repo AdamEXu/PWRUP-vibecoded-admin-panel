@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-import { CompShell } from "./comp-shell";
 
 export const metadata: Metadata = {
-  title: "PWRUP Comp",
-  description: "PWRUP Competition Dashboard",
+  title: "PWRUP Match HUD",
+  description: "PWRUP Competition Match Display",
 };
 
 export default function RootLayout({
@@ -14,11 +13,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="antialiased">
-        <Providers>
-          <CompShell>{children}</CompShell>
-        </Providers>
+    <html lang="en">
+      <body className="antialiased overflow-hidden">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

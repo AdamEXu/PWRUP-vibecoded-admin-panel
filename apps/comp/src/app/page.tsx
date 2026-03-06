@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { MatchHUD } from "@/components/match/MatchHUD";
 
 export default function HomePage() {
-  redirect("/video");
+  return <MatchHUD />;
 }
