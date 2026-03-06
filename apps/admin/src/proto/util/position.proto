@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package proto.util;
+
+import "util/vector.proto";
+
+message Position3d {
+  util.Vector3 position = 1;
+  util.Vector3 direction = 2;
+}
+
+message Position2d {
+  util.Vector2 position = 1;
+  util.Vector2 direction = 2;
+}
+
+message Rotation3d {
+  util.Vector3 directionX = 1;
+  util.Vector3 directionY = 2;
+  util.Vector3 directionZ = 3;
+  float yaw = 4;
+}
+
+message RobotPosition {
+  oneof position {
+    Position2d position_2d = 1;
+    Position3d position_3d = 2;
+  }
+  float timestamp = 3;
+  float confidence = 4;
+  repeated float P = 5;
+}

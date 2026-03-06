@@ -1,0 +1,20 @@
+{
+  "name": "@pwrup/shared-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./settings": "./src/settings.tsx",
+    "./hooks/usePathNetworkTable": "./src/hooks/usePathNetworkTable.ts",
+    "./hooks/usePathLibrary": "./src/hooks/usePathLibrary.ts",
+    "./path-library/pathLibrary": "./src/path-library/pathLibrary.ts",
+    "./path-library/pathLibraryServer": "./src/path-library/pathLibraryServer.ts",
+    "./watchdog/watchdogApi": "./src/watchdog/watchdogApi.ts",
+    "./settings-store": "./src/settings-store.ts",
+    "./settings-schema": "./src/settings-schema.ts"
+  },
+  "dependencies": {
+    "ntcore-ts-client": "^3.1.3",
+    "react": "^19.0.0"
+  }
+}

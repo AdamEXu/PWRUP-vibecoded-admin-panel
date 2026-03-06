@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package proto.status;
+
+message PIDFFUpdateMessage {
+    float p = 1;
+    float i = 2;
+    float d = 3;
+    float ff = 4;
+}
