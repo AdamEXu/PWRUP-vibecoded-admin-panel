@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package frc4765.proto.util;
-
-message SelectedPath {
-  string path_name = 1;
-}
