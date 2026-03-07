@@ -4,17 +4,11 @@ import { useMemo } from "react";
 import { NetworkTablesTypeInfos } from "ntcore-ts-client";
 import { NT } from "./constants";
 import {
-  computeHubStatus,
-  computeHeaderColor,
-  computeMatchPhase,
-  computeShiftTimeRemaining,
-  computeTotalTimeRemaining,
-  getShiftIndex,
-  isAutonomous,
+  computeDerivedMatchState,
 } from "./matchTimeline";
+import { useAutobahnRobotPose } from "./useAutobahnRobotPose";
 import { useNTopic } from "./useNTopic";
 import type { MatchState } from "./types";
-import { HUB_WARNING_S } from "./constants";
 
 export function useMatchState(): MatchState {
   // ── FMS Topics (standard WPILib — no robot code changes needed) ──────────
@@ -40,21 +34,25 @@ export function useMatchState(): MatchState {
   );
 
   // ── Pose (robot-published) ────────────────────────────────────────────────
-  const { value: robotPoseX } = useNTopic<number>(
+  const { value: ntRobotPoseX } = useNTopic<number>(
     NT.POSE_X,
     NetworkTablesTypeInfos.kDouble,
     0,
   );
-  const { value: robotPoseY } = useNTopic<number>(
+  const { value: ntRobotPoseY } = useNTopic<number>(
     NT.POSE_Y,
     NetworkTablesTypeInfos.kDouble,
     0,
   );
-  const { value: robotHeading } = useNTopic<number>(
+  const { value: ntRobotHeading } = useNTopic<number>(
     NT.POSE_HEADING,
     NetworkTablesTypeInfos.kDouble,
     0,
   );
+  const autobahnPose = useAutobahnRobotPose();
+  const robotPoseX = autobahnPose.hasPose ? autobahnPose.x : ntRobotPoseX;
+  const robotPoseY = autobahnPose.hasPose ? autobahnPose.y : ntRobotPoseY;
+  const robotHeading = autobahnPose.hasPose ? autobahnPose.heading : ntRobotHeading;
 
   // ── Auto-Align (robot-published) ─────────────────────────────────────────
   const { value: autoAlignActive } = useNTopic<boolean>(
@@ -82,36 +80,23 @@ export function useMatchState(): MatchState {
 
   // ── Derived state (pure computations) ────────────────────────────────────
   const derived = useMemo(() => {
-    const inAuto = isAutonomous(fmsControlData);
-    const matchPhase = computeMatchPhase(fmsMatchTime, inAuto);
-    const totalTimeRemaining = computeTotalTimeRemaining(fmsMatchTime, inAuto);
-    const shiftIndex = getShiftIndex(matchPhase);
-    const shiftTimeRemaining = computeShiftTimeRemaining(fmsMatchTime, matchPhase);
-    const hubStatus = computeHubStatus(
-      matchPhase,
-      shiftTimeRemaining,
-      shiftIndex,
+    return computeDerivedMatchState({
+      fmsControlData,
+      fmsMatchTime,
       isRedAlliance,
       gameSpecificMessage,
-    );
-    const shiftTimeWithBuffer =
-      hubStatus === "warning" ? shiftTimeRemaining + HUB_WARNING_S : shiftTimeRemaining;
-    const headerColor = computeHeaderColor(hubStatus, isRedAlliance, matchPhase, driverOverride);
-
-    return {
-      matchPhase,
-      totalTimeRemaining,
-      shiftTimeRemaining,
-      shiftTimeWithBuffer,
-      hubStatus,
-      headerColor,
-    };
+      driverOverride,
+      autoAlignActive,
+      autoAlignReady,
+    });
   }, [
     fmsControlData,
     fmsMatchTime,
     isRedAlliance,
     gameSpecificMessage,
     driverOverride,
+    autoAlignActive,
+    autoAlignReady,
   ]);
 
   return {

@@ -8,7 +8,8 @@
 import {
   AUTO_DURATION_S,
   FMS_BIT_AUTONOMOUS,
-  HUB_WARNING_S,
+  HUB_BUFFER_S,
+  SHIFT_DURATION_S,
   SHIFT1_END_S,
   SHIFT2_END_S,
   SHIFT3_END_S,
@@ -135,11 +136,9 @@ export function computeHubStatus(
 ): HubStatus {
   switch (phase) {
     case "autonomous":
+    case "transition":
     case "endgame":
       return "both"; // Both hubs active
-
-    case "transition":
-      return "none"; // Neither hub active (brief transition)
 
     case "pre_match":
     case "post_match":
@@ -150,12 +149,12 @@ export function computeHubStatus(
     case "shift3":
     case "shift4": {
       const ourActive = isOurHubActiveThisShift(shiftIndex, isRedAlliance, gameSpecificMessage);
-      if (!ourActive) return "inactive";
+      if (ourActive) return "active";
 
-      // Within the warning window before deactivation?
-      if (shiftTimeRemaining <= HUB_WARNING_S) return "warning";
-
-      return "active";
+      // Figma warning state is the post-deactivation buffer at the start of an inactive shift.
+      const elapsedInShift = Math.max(0, SHIFT_DURATION_S - shiftTimeRemaining);
+      if (elapsedInShift < HUB_BUFFER_S) return "warning";
+      return "inactive";
     }
 
     default:
@@ -164,27 +163,107 @@ export function computeHubStatus(
 }
 
 /**
+ * "With buffer" value for manual post-deactivation scoring:
+ * - active   => remaining shift time + buffer window (Figma behavior)
+ * - warning  => remaining post-deactivation buffer only
+ * - inactive => countdown to next active time (raw shift timer)
+ */
+export function computeShiftTimeWithBuffer(
+  shiftTimeRemaining: number,
+  hubStatus: HubStatus,
+): number {
+  if (hubStatus === "active") return shiftTimeRemaining + HUB_BUFFER_S;
+
+  if (hubStatus === "warning") {
+    const elapsedInShift = Math.max(0, SHIFT_DURATION_S - shiftTimeRemaining);
+    return Math.max(0, HUB_BUFFER_S - elapsedInShift);
+  }
+
+  return shiftTimeRemaining;
+}
+
+/**
  * Compute the header bar color.
  */
 export function computeHeaderColor(
   hubStatus: HubStatus,
-  isRedAlliance: boolean,
   phase: MatchPhase,
   driverOverride: boolean,
+  autoAlignActive: boolean,
+  autoAlignReady: boolean,
 ): HeaderColor {
-  // Purple: autonomous period, or driver has taken override
-  if (phase === "autonomous" || driverOverride) return "purple";
+  // Purple mode takes precedence in Figma.
+  // It appears in autonomous and when auto-align is active but not ready.
+  if (phase === "autonomous" || driverOverride || (autoAlignActive && !autoAlignReady)) {
+    return "purple";
+  }
 
   switch (hubStatus) {
-    case "active":
     case "warning":
+      return "yellow";
+    case "active":
     case "both":
-      return isRedAlliance ? "red" : "blue";
+      return "green";
     case "inactive":
     case "none":
     default:
       return "hidden";
   }
+}
+
+interface DerivedMatchStateInput {
+  fmsControlData: number;
+  fmsMatchTime: number;
+  isRedAlliance: boolean;
+  gameSpecificMessage: string;
+  driverOverride: boolean;
+  autoAlignActive: boolean;
+  autoAlignReady: boolean;
+}
+
+export interface DerivedMatchState {
+  matchPhase: MatchPhase;
+  totalTimeRemaining: number;
+  shiftTimeRemaining: number;
+  shiftTimeWithBuffer: number;
+  hubStatus: HubStatus;
+  headerColor: HeaderColor;
+}
+
+/**
+ * Single source of truth for derived stage/hub/header state.
+ * Both live and mock hooks use this so test behavior matches production behavior.
+ */
+export function computeDerivedMatchState(input: DerivedMatchStateInput): DerivedMatchState {
+  const inAuto = isAutonomous(input.fmsControlData);
+  const matchPhase = computeMatchPhase(input.fmsMatchTime, inAuto);
+  const totalTimeRemaining = computeTotalTimeRemaining(input.fmsMatchTime, inAuto);
+  const shiftIndex = getShiftIndex(matchPhase);
+  const shiftTimeRemaining = computeShiftTimeRemaining(input.fmsMatchTime, matchPhase);
+  const hubStatus = computeHubStatus(
+    matchPhase,
+    shiftTimeRemaining,
+    shiftIndex,
+    input.isRedAlliance,
+    input.gameSpecificMessage,
+  );
+  const shiftTimeWithBuffer = computeShiftTimeWithBuffer(shiftTimeRemaining, hubStatus);
+  const headerColor = computeHeaderColor(
+    hubStatus,
+    matchPhase,
+    input.driverOverride,
+    input.autoAlignActive,
+    input.autoAlignReady,
+  );
+
+  return {
+    matchPhase,
+    totalTimeRemaining,
+    shiftTimeRemaining,
+    shiftTimeWithBuffer,
+    hubStatus,
+    headerColor,
+  };
 }
 
 // ─── Timer Formatting ─────────────────────────────────────────────────────────

@@ -66,18 +66,22 @@ export function MainTimer({ fmsMatchTime, totalTimeRemaining }: Props) {
 
   return (
     <div
-      className="flex items-baseline justify-center select-none"
-      style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}
+      className="flex items-end justify-center select-none"
+      style={{
+        width: "48.85vw",
+        textAlign: "center",
+        fontFamily: "'Roboto Mono', 'SF Mono', ui-monospace, monospace",
+      }}
     >
       <span
         ref={minSecRef}
-        style={{ fontSize: "6.7vw", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.02em" }}
+        style={{ fontSize: "6.67vw", fontWeight: 400, lineHeight: "normal" }}
       >
         {initialMinSec}
       </span>
       <span
         ref={csRef}
-        style={{ fontSize: "3.3vw", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.01em", marginLeft: "0.2vw" }}
+        style={{ fontSize: "3.33vw", fontWeight: 400, lineHeight: "normal" }}
         className="text-white"
       >
         {initialCs}

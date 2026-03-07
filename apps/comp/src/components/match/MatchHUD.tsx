@@ -39,6 +39,7 @@ export function MatchHUD() {
       <ShiftIndicator
         hubStatus={state.hubStatus}
         matchPhase={state.matchPhase}
+        periodTimeRemaining={state.fmsMatchTime}
         shiftTimeRemaining={state.shiftTimeRemaining}
         shiftTimeWithBuffer={state.shiftTimeWithBuffer}
       />

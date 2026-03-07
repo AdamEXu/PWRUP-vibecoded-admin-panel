@@ -12,12 +12,12 @@ export type MatchPhase =
 /** Whether our hub is accepting fuel right now */
 export type HubStatus =
   | "active"    // Hub is on — score now
-  | "warning"   // Last 3s before hub deactivates — still scoring, but hurry
+  | "warning"   // Hub just deactivated; buffer scoring window still active
   | "inactive"  // Hub is off — opponent's turn
-  | "both"      // Both hubs active (autonomous / endgame / transition)
+  | "both"      // Both hubs active (autonomous / transition / endgame)
   | "none";     // Neither hub active (shouldn't happen, fallback)
 
-export type HeaderColor = "red" | "blue" | "purple" | "hidden";
+export type HeaderColor = "green" | "yellow" | "purple" | "hidden";
 
 export interface MatchState {
   // Raw NT values

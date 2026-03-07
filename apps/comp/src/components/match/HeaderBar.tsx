@@ -10,16 +10,16 @@ interface Props {
 }
 
 const COLOR_MAP: Record<Exclude<HeaderColor, "hidden">, string> = {
-  red: "#d00000",
-  blue: "#0055cc",
-  purple: "#7c3aed",
+  green: "#70cd35",
+  yellow: "#ffd900",
+  purple: "#a600ff",
 };
 
 /**
  * 1920×180 header bar at the top of the HUD.
  *
- * - Colored (red/blue/purple) when our hub is active
- * - Invisible when our hub is inactive
+ * - Colored (green/yellow/purple) per hub state and special modes
+ * - Invisible when hub is inactive
  * - Contains the main match countdown timer
  */
 export function HeaderBar({ headerColor, fmsMatchTime, totalTimeRemaining }: Props) {
@@ -36,8 +36,6 @@ export function HeaderBar({ headerColor, fmsMatchTime, totalTimeRemaining }: Pro
         width: "100%",
         height: "16.67vh",
         backgroundColor: bgColor,
-        opacity: isHidden ? 0 : 1,
-        transition: "background-color 300ms ease, opacity 300ms ease",
         zIndex: 10,
       }}
     >

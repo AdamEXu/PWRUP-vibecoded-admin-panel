@@ -25,8 +25,11 @@ export const SHIFT3_END_S = 55;
 export const SHIFT4_END_S = 30;
 export const ENDGAME_END_S = 0;
 
-/** Seconds before hub deactivation where we show the "warning" state */
-export const HUB_WARNING_S = 3;
+/** Manual scoring buffer in seconds after a HUB deactivates. */
+export const HUB_BUFFER_S = 3;
+
+/** Duration of each alliance shift in teleop. */
+export const SHIFT_DURATION_S = 25;
 
 // ─── NetworkTables Topic Paths ────────────────────────────────────────────────
 export const NT = {
@@ -63,4 +66,7 @@ export const COLOR_ORANGE = "#ff9d00";
 export const COLOR_YELLOW = "#ffd900";
 
 // ─── Autobahn camera topic for auto-align overlay ────────────────────────────
-export const CAMERA_ALIGN_TOPIC = "apriltag/camera";
+export const CAMERA_ALIGN_TOPIC = "camera/front_left/video";
+
+// ─── Autobahn pose topic ──────────────────────────────────────────────────────
+export const ROBOT_POSITION_TOPIC = "pos-extrapolator/robot-position";

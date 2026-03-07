@@ -3,70 +3,143 @@
 import { useState, useEffect, useMemo } from "react";
 import type { MatchState } from "./types";
 import {
-  computeMatchPhase,
-  computeTotalTimeRemaining,
-  computeShiftTimeRemaining,
-  computeHubStatus,
-  computeHeaderColor,
-  getShiftIndex,
-  isAutonomous,
+  computeDerivedMatchState,
 } from "./matchTimeline";
-import { HUB_WARNING_S } from "./constants";
+import {
+  AUTO_DURATION_S,
+  SHIFT1_END_S,
+  SHIFT2_END_S,
+  SHIFT3_END_S,
+  SHIFT4_END_S,
+  TELEOP_DURATION_S,
+  TRANSITION_END_S,
+} from "./constants";
 
-type MockScenario = "auto" | "shift1" | "shift2" | "warning" | "endgame" | "camera";
+type MockScenario =
+  | "autonomous"
+  | "transition_shift"
+  | "shift1"
+  | "shift2"
+  | "shift3"
+  | "shift4"
+  | "endgame"
+  | "warning"
+  | "inactive"
+  | "camera";
+
+const SCENARIO_ALIASES: Record<string, MockScenario> = {
+  // Official period names
+  autonomous: "autonomous",
+  transition_shift: "transition_shift",
+  shift1: "shift1",
+  shift2: "shift2",
+  shift3: "shift3",
+  shift4: "shift4",
+  endgame: "endgame",
+
+  // URL-friendly variants
+  "transition-shift": "transition_shift",
+  "end-game": "endgame",
+
+  // Legacy aliases
+  auto: "autonomous",
+  transition: "transition_shift",
+  warning: "warning",
+  inactive: "inactive",
+  camera: "camera",
+};
+
+function parseScenario(raw: string): MockScenario {
+  return SCENARIO_ALIASES[raw.toLowerCase()] ?? "autonomous";
+}
 
 function getScenarioStartTime(scenario: MockScenario): { fmsMatchTime: number; inAuto: boolean } {
+  const transitionMidpoint = (TELEOP_DURATION_S + TRANSITION_END_S) / 2;
+  const shift1Midpoint = (TRANSITION_END_S + SHIFT1_END_S) / 2;
+  const shift2Midpoint = (SHIFT1_END_S + SHIFT2_END_S) / 2;
+  const shift3Midpoint = (SHIFT2_END_S + SHIFT3_END_S) / 2;
+  const shift4Midpoint = (SHIFT3_END_S + SHIFT4_END_S) / 2;
+  const endgameMidpoint = (SHIFT4_END_S + 0) / 2;
+
   switch (scenario) {
-    case "auto":     return { fmsMatchTime: 15,  inAuto: true  };
-    case "shift1":   return { fmsMatchTime: 120, inAuto: false };
-    case "shift2":   return { fmsMatchTime: 95,  inAuto: false };
-    case "warning":  return { fmsMatchTime: 108, inAuto: false }; // shift1 warning zone
-    case "endgame":  return { fmsMatchTime: 25,  inAuto: false };
-    case "camera":   return { fmsMatchTime: 95,  inAuto: false };
+    case "autonomous": return { fmsMatchTime: AUTO_DURATION_S, inAuto: true };
+    case "transition_shift": return { fmsMatchTime: transitionMidpoint, inAuto: false };
+    case "shift1": return { fmsMatchTime: shift1Midpoint, inAuto: false };
+    case "shift2": return { fmsMatchTime: shift2Midpoint, inAuto: false };
+    case "shift3": return { fmsMatchTime: shift3Midpoint, inAuto: false };
+    case "shift4": return { fmsMatchTime: shift4Midpoint, inAuto: false };
+    case "endgame": return { fmsMatchTime: endgameMidpoint, inAuto: false };
+    case "warning": return { fmsMatchTime: TRANSITION_END_S - 2, inAuto: false };
+    case "inactive": return { fmsMatchTime: shift1Midpoint, inAuto: false };
+    case "camera": return { fmsMatchTime: shift2Midpoint, inAuto: false };
   }
+}
+
+function stepMockClock(
+  prev: { fmsMatchTime: number; inAuto: boolean },
+): { fmsMatchTime: number; inAuto: boolean } {
+  const nextTime = Math.max(0, parseFloat((prev.fmsMatchTime - 0.1).toFixed(1)));
+
+  // In mock autonomous flow, FMS transitions to teleop at 0:00 and MatchTime
+  // resets to 2:20 (140s) for the next period.
+  if (prev.inAuto && nextTime <= 0) {
+    return { inAuto: false, fmsMatchTime: TELEOP_DURATION_S };
+  }
+
+  return { ...prev, fmsMatchTime: nextTime };
 }
 
 /**
  * Simulates a running match for UI development.
  * Activated via ?mock or ?mock=<scenario> in the URL.
  *
- * Scenarios: auto | shift1 (default) | shift2 | warning | endgame | camera
+ * Official period scenarios:
+ *   autonomous (default) | transition_shift | shift1 | shift2 | shift3 | shift4 | endgame
+ *
+ * Debug scenarios:
+ *   warning | inactive | camera
+ *
+ * Legacy aliases still supported:
+ *   auto -> autonomous, transition -> transition_shift
+ *
  * Example: http://localhost:3001/?mock=warning
  */
 export function useMockMatchState(): MatchState {
   const scenario = useMemo<MockScenario>(() => {
-    if (typeof window === "undefined") return "shift1";
+    if (typeof window === "undefined") return "autonomous";
     const val = new URLSearchParams(window.location.search).get("mock") ?? "";
-    const valid: MockScenario[] = ["auto", "shift1", "shift2", "warning", "endgame", "camera"];
-    return valid.includes(val as MockScenario) ? (val as MockScenario) : "shift1";
+    return parseScenario(val);
   }, []);
 
   const start = useMemo(() => getScenarioStartTime(scenario), [scenario]);
 
-  const [fmsMatchTime, setFmsMatchTime] = useState(start.fmsMatchTime);
+  const [clock, setClock] = useState(start);
 
   useEffect(() => {
-    setFmsMatchTime(start.fmsMatchTime);
+    setClock(start);
     const id = setInterval(() => {
-      setFmsMatchTime((t) => Math.max(0, parseFloat((t - 0.1).toFixed(1))));
+      setClock((prev) => stepMockClock(prev));
     }, 100);
     return () => clearInterval(id);
   }, [start]);
 
-  const fmsControlData = start.inAuto ? 0x03 : 0x01; // enabled + auto | enabled teleop
+  const fmsMatchTime = clock.fmsMatchTime;
+  const fmsControlData = clock.inAuto ? 0x03 : 0x01; // enabled + auto | enabled teleop
   const isRedAlliance = true;
   const gameSpecificMessage = "R"; // red hub deactivates first
   const driverOverride = false;
   const autoAlignActive = scenario === "camera";
+  const autoAlignReady = false;
 
-  const inAuto = isAutonomous(fmsControlData);
-  const matchPhase = computeMatchPhase(fmsMatchTime, inAuto);
-  const totalTimeRemaining = computeTotalTimeRemaining(fmsMatchTime, inAuto);
-  const shiftIndex = getShiftIndex(matchPhase);
-  const shiftTimeRemaining = computeShiftTimeRemaining(fmsMatchTime, matchPhase);
-  const hubStatus = computeHubStatus(matchPhase, shiftTimeRemaining, shiftIndex, isRedAlliance, gameSpecificMessage);
-  const shiftTimeWithBuffer = hubStatus === "warning" ? shiftTimeRemaining + HUB_WARNING_S : shiftTimeRemaining;
-  const headerColor = computeHeaderColor(hubStatus, isRedAlliance, matchPhase, driverOverride);
+  const derived = computeDerivedMatchState({
+    fmsControlData,
+    fmsMatchTime,
+    isRedAlliance,
+    gameSpecificMessage,
+    driverOverride,
+    autoAlignActive,
+    autoAlignReady,
+  });
 
   return {
     isRedAlliance,
@@ -78,14 +151,9 @@ export function useMockMatchState(): MatchState {
     robotHeading: 0.5,
     autoAlignActive,
     autoAlignDistance: 1.8,
-    autoAlignReady: false,
+    autoAlignReady,
     driverOverride,
     isConnected: true,
-    matchPhase,
-    totalTimeRemaining,
-    shiftTimeRemaining,
-    shiftTimeWithBuffer,
-    hubStatus,
-    headerColor,
+    ...derived,
   };
 }
