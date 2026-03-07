@@ -20,13 +20,13 @@ export type HubStatus =
 export type HeaderColor = "green" | "yellow" | "purple" | "hidden";
 
 export interface MatchState {
-  // Raw NT values
+  // Published match state
   isRedAlliance: boolean;
   /** 'R' = red alliance hub deactivates first; 'B' = blue first; '' = unknown */
   gameSpecificMessage: string;
-  /** Bitmask: bit1 = isAutonomous */
+  /** Synthetic WPILib-style bitmask preserved for compatibility with mock logic. */
   fmsControlData: number;
-  /** Remaining time in current period from FMS (seconds, -1 = not in match) */
+  /** Remaining seconds in the currently published match phase. */
   fmsMatchTime: number;
 
   // Robot pose
@@ -46,10 +46,17 @@ export interface MatchState {
   totalTimeRemaining: number;
   /** Seconds remaining in current shift (0 when not in a shift) */
   shiftTimeRemaining: number;
-  /** shiftTimeRemaining + BUFFER_SECONDS when in warning state */
+  /** Active-shift time including next buffer, or warning buffer remaining. */
   shiftTimeWithBuffer: number;
+  /** Warning buffer countdown from the robot publisher. */
+  bufferRemaining: number;
+  /** Whether the lower timer block should be rendered. */
+  showShiftIndicator: boolean;
+  /** Whether the secondary "with buffer" timer should be rendered. */
+  showBuffer: boolean;
   hubStatus: HubStatus;
   headerColor: HeaderColor;
+  cameraTopic: string;
 
   isConnected: boolean;
 }

@@ -16,6 +16,7 @@ import { CAMERA_ALIGN_TOPIC } from "./constants";
 export function useAutoAlignCamera(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   enabled: boolean,
+  topic: string,
 ) {
   const { settings } = useSettings();
 
@@ -44,16 +45,20 @@ export function useAutoAlignCamera(
 
   // Subscribe / unsubscribe based on enabled flag
   useEffect(() => {
+    const subscriptionTopic = topic || CAMERA_ALIGN_TOPIC;
+
     if (!enabled) {
-      client.unsubscribe(CAMERA_ALIGN_TOPIC);
+      client.unsubscribe(subscriptionTopic);
       frameQueueRef.current = null;
       return;
     }
-    client.subscribe(CAMERA_ALIGN_TOPIC, onFrame);
+    frameQueueRef.current = null;
+    client.subscribe(subscriptionTopic, onFrame);
     return () => {
-      client.unsubscribe(CAMERA_ALIGN_TOPIC);
+      client.unsubscribe(subscriptionTopic);
+      frameQueueRef.current = null;
     };
-  }, [client, enabled, onFrame]);
+  }, [client, enabled, onFrame, topic]);
 
   // RAF render loop
   useEffect(() => {

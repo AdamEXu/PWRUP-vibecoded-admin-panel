@@ -7,6 +7,7 @@ import {
 } from "./matchTimeline";
 import {
   AUTO_DURATION_S,
+  CAMERA_ALIGN_TOPIC,
   SHIFT1_END_S,
   SHIFT2_END_S,
   SHIFT3_END_S,
@@ -75,6 +76,29 @@ function getScenarioStartTime(scenario: MockScenario): { fmsMatchTime: number; i
   }
 }
 
+function computeMockPeriodTimeRemaining(
+  fmsMatchTime: number,
+  matchPhase: MatchState["matchPhase"],
+): number {
+  switch (matchPhase) {
+    case "autonomous":
+    case "endgame":
+      return fmsMatchTime;
+    case "transition":
+      return Math.max(0, fmsMatchTime - TRANSITION_END_S);
+    case "shift1":
+      return Math.max(0, fmsMatchTime - SHIFT1_END_S);
+    case "shift2":
+      return Math.max(0, fmsMatchTime - SHIFT2_END_S);
+    case "shift3":
+      return Math.max(0, fmsMatchTime - SHIFT3_END_S);
+    case "shift4":
+      return Math.max(0, fmsMatchTime - SHIFT4_END_S);
+    default:
+      return -1;
+  }
+}
+
 function stepMockClock(
   prev: { fmsMatchTime: number; inAuto: boolean },
 ): { fmsMatchTime: number; inAuto: boolean } {
@@ -140,12 +164,25 @@ export function useMockMatchState(): MatchState {
     autoAlignActive,
     autoAlignReady,
   });
+  const phaseLocalTimeRemaining = computeMockPeriodTimeRemaining(fmsMatchTime, derived.matchPhase);
+  const showShiftIndicator = [
+    "autonomous",
+    "transition",
+    "shift1",
+    "shift2",
+    "shift3",
+    "shift4",
+    "endgame",
+  ].includes(derived.matchPhase);
+  const showBuffer = ["shift1", "shift2", "shift3", "shift4"].includes(derived.matchPhase)
+    && (derived.hubStatus === "active" || derived.hubStatus === "warning");
+  const bufferRemaining = derived.hubStatus === "warning" ? derived.shiftTimeWithBuffer : 0;
 
   return {
     isRedAlliance,
     gameSpecificMessage,
     fmsControlData,
-    fmsMatchTime,
+    fmsMatchTime: phaseLocalTimeRemaining,
     robotPoseX: 3.5,
     robotPoseY: 4.1,
     robotHeading: 0.5,
@@ -153,6 +190,10 @@ export function useMockMatchState(): MatchState {
     autoAlignDistance: 1.8,
     autoAlignReady,
     driverOverride,
+    bufferRemaining,
+    showShiftIndicator,
+    showBuffer,
+    cameraTopic: CAMERA_ALIGN_TOPIC,
     isConnected: true,
     ...derived,
   };

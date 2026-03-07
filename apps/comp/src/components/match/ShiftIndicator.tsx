@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { HubStatus, MatchPhase } from "@/lib/match/types";
-import { TRANSITION_END_S } from "@/lib/match/constants";
 import { HubStatusIcon } from "./HubStatusIcon";
 
 interface Props {
@@ -11,6 +10,9 @@ interface Props {
   periodTimeRemaining: number;
   shiftTimeRemaining: number;
   shiftTimeWithBuffer: number;
+  bufferRemaining: number;
+  showBuffer: boolean;
+  showShiftIndicator: boolean;
 }
 
 /**
@@ -27,25 +29,26 @@ export function ShiftIndicator({
   periodTimeRemaining,
   shiftTimeRemaining,
   shiftTimeWithBuffer,
+  bufferRemaining,
+  showBuffer,
+  showShiftIndicator,
 }: Props) {
   const nowMs = () =>
     typeof performance !== "undefined" ? performance.now() : Date.now();
 
-  const inShift = ["shift1", "shift2", "shift3", "shift4"].includes(matchPhase);
-  const inTransition = matchPhase === "transition";
   const inEndgame = matchPhase === "endgame";
   const inAuto = matchPhase === "autonomous";
+  const inTransition = matchPhase === "transition";
   const inBothHubPeriods = inEndgame || inAuto || inTransition;
 
   const baseDisplayTime = inBothHubPeriods
-    ? inTransition
-      ? Math.max(0, periodTimeRemaining - TRANSITION_END_S)
-      : Math.max(0, periodTimeRemaining)
+    ? Math.max(0, periodTimeRemaining)
     : hubStatus === "warning"
       ? 0
       : shiftTimeRemaining;
-  const showBuffer = inShift && (hubStatus === "active" || hubStatus === "warning");
-  const baseBufferTime = showBuffer ? Math.max(0, shiftTimeWithBuffer) : null;
+  const baseBufferTime = showBuffer
+    ? Math.max(0, hubStatus === "warning" ? bufferRemaining : shiftTimeWithBuffer)
+    : null;
 
   const snapshotRef = useRef({
     display: baseDisplayTime,
@@ -72,7 +75,7 @@ export function ShiftIndicator({
     return () => cancelAnimationFrame(rafId);
   }, []);
 
-  if (!inShift && !inBothHubPeriods) return null;
+  if (!showShiftIndicator) return null;
 
   const elapsedS = Math.max(0, (frameNowMs - snapshotRef.current.timestampMs) / 1000);
   const isPostDeactivationBuffer = hubStatus === "warning";

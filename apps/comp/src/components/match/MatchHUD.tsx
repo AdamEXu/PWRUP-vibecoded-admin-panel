@@ -42,6 +42,9 @@ export function MatchHUD() {
         periodTimeRemaining={state.fmsMatchTime}
         shiftTimeRemaining={state.shiftTimeRemaining}
         shiftTimeWithBuffer={state.shiftTimeWithBuffer}
+        bufferRemaining={state.bufferRemaining}
+        showBuffer={state.showBuffer}
+        showShiftIndicator={state.showShiftIndicator}
       />
 
       {/* Minimap — centered, 28.125% from left, fills to bottom */}
@@ -57,6 +60,7 @@ export function MatchHUD() {
         active={state.autoAlignActive}
         distanceToTarget={state.autoAlignDistance}
         isReady={state.autoAlignReady}
+        cameraTopic={state.cameraTopic}
       />
 
       <ConnectionLost visible={!state.isConnected} />

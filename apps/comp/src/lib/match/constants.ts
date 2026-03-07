@@ -68,5 +68,5 @@ export const COLOR_YELLOW = "#ffd900";
 // ─── Autobahn camera topic for auto-align overlay ────────────────────────────
 export const CAMERA_ALIGN_TOPIC = "camera/front_left/video";
 
-// ─── Autobahn pose topic ──────────────────────────────────────────────────────
-export const ROBOT_POSITION_TOPIC = "pos-extrapolator/robot-position";
+// ─── Autobahn MatchHUD topic ──────────────────────────────────────────────────
+export const MATCH_HUD_TOPIC = "matchhud/state";
