@@ -22,7 +22,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/fonts/SF-Pro.otf") format("opentype");
+  src: url("/fonts/SF-Pro.ttf") format("truetype");
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────── */

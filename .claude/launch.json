@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "comp",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@pwrup/comp", "run", "dev:renderer"],
+      "port": 3001
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@pwrup/admin", "run", "dev:renderer"],
+      "port": 3000
+    }
+  ]
+}
