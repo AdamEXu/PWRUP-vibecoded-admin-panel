@@ -8,6 +8,7 @@ interface Props {
   active: boolean;
   distanceToTarget: number;
   isReady: boolean;
+  cameraTopic: string;
 }
 
 // Distance ruler overlays from Figma (576×432 camera frame).
@@ -42,10 +43,10 @@ const DISTANCE_RULERS: {
  * Ruler lines are colored semi-transparent bands overlaid on camera feed.
  * Labels sit ABOVE ruler lines, left-aligned at x=7px.
  */
-export function CameraOverlay({ active, distanceToTarget, isReady }: Props) {
+export function CameraOverlay({ active, distanceToTarget, isReady, cameraTopic }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useAutoAlignCamera(canvasRef, active);
+  useAutoAlignCamera(canvasRef, active, cameraTopic);
 
   if (!active) return null;
 
