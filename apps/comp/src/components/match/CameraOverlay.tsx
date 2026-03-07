@@ -10,28 +10,37 @@ interface Props {
   isReady: boolean;
 }
 
-// Distance ruler lines: each entry is a visual guide overlaid on the camera feed.
-// Positions are expressed as a fraction of the frame height (top = 0, bottom = 1).
-// Calibrated from the Figma design (576×432 frame):
-//   2.0m at y=161 → 37.3%
-//   1.5m at y=195 → 45.1%
-//   1.0m at y=247 → 57.2%
-//   0.5m at y=325 → 75.2%
-const DISTANCE_RULERS: { label: string; posY: number; color: string }[] = [
-  { label: "2.0m", posY: 0.373, color: COLOR_GREEN },
-  { label: "1.5m", posY: 0.451, color: COLOR_YELLOW },
-  { label: "1.0m", posY: 0.572, color: COLOR_ORANGE },
-  { label: "0.5m", posY: 0.752, color: "#ef4444" },
+// Distance ruler overlays from Figma (576×432 camera frame).
+// Each ruler is a colored semi-transparent band (not a thin line).
+// lineY: center y-position of the horizontal ruler (fraction of frame height)
+// bandHeight: height of the colored band (px in Figma, converted to %)
+// labelY: bottom-edge of label text (label extends upward via translateY(-100%))
+// Bands get thicker as distance decreases (closer = bigger visual emphasis).
+const DISTANCE_RULERS: {
+  label: string;
+  lineY: number;
+  labelY: number;
+  bandTop: number;   // top of band as fraction
+  bandBottom: number; // bottom of band as fraction
+  color: string;
+  fontSize: string;
+}[] = [
+  // 2.0m: line at y=220, band 20px tall (210-230), label bottom at 217
+  { label: "2.0m", lineY: 220 / 432, labelY: 217 / 432, bandTop: 210 / 432, bandBottom: 230 / 432, color: COLOR_GREEN,  fontSize: "1.04vw" },
+  // 1.5m: line at y=257, band 24px tall (243-267), label bottom at 251
+  { label: "1.5m", lineY: 257 / 432, labelY: 251 / 432, bandTop: 243 / 432, bandBottom: 267 / 432, color: COLOR_YELLOW, fontSize: "1.25vw" },
+  // 1.0m: line at y=310, band 28px tall (292-320), label bottom at 303
+  { label: "1.0m", lineY: 310 / 432, labelY: 303 / 432, bandTop: 292 / 432, bandBottom: 320 / 432, color: COLOR_ORANGE, fontSize: "1.875vw" },
+  // 0.5m: line at y=390, band 32px tall (368-400), label bottom at 381
+  { label: "0.5m", lineY: 390 / 432, labelY: 381 / 432, bandTop: 368 / 432, bandBottom: 400 / 432, color: "#ef4444",    fontSize: "2.5vw"   },
 ];
-
-const OVERLAY_W = 576;
-const OVERLAY_H = 432;
 
 /**
  * Auto-align camera overlay — visible only when robot is auto-aligning.
  *
- * Shows a grayscale camera feed (via Autobahn protobuf) with distance ruler
- * lines and a status message below.
+ * Figma (1920×1080): left:1304 top:220 w:576 h:432 rounded:16px
+ * Ruler lines are colored semi-transparent bands overlaid on camera feed.
+ * Labels sit ABOVE ruler lines, left-aligned at x=7px.
  */
 export function CameraOverlay({ active, distanceToTarget, isReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,24 +59,23 @@ export function CameraOverlay({ active, distanceToTarget, isReady }: Props) {
     <div
       style={{
         position: "absolute",
-        top: 200,
-        right: 80,
-        width: OVERLAY_W,
-        zIndex: 20,
+        left: "67.9%",
+        top: "20.37vh",
+        width: "30vw",
       }}
     >
-      {/* Camera frame + ruler lines */}
+      {/* Camera frame */}
       <div
         style={{
           position: "relative",
-          width: OVERLAY_W,
-          height: OVERLAY_H,
-          borderRadius: 8,
+          width: "100%",
+          aspectRatio: "576 / 432",
+          borderRadius: "0.83vw",
           overflow: "hidden",
           backgroundColor: "#111",
         }}
       >
-        {/* Grayscale canvas for camera feed */}
+        {/* Canvas for camera feed */}
         <canvas
           ref={canvasRef}
           style={{
@@ -76,61 +84,67 @@ export function CameraOverlay({ active, distanceToTarget, isReady }: Props) {
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            filter: "grayscale(100%)",
           }}
         />
 
-        {/* Distance ruler lines */}
-        {DISTANCE_RULERS.map(({ label, posY, color }) => (
-          <div
-            key={label}
-            style={{
-              position: "absolute",
-              top: `${posY * 100}%`,
-              left: 0,
-              right: 0,
-              display: "flex",
-              alignItems: "center",
-              pointerEvents: "none",
-            }}
-          >
-            {/* Line */}
+        {/* Distance ruler overlay bands + labels */}
+        {DISTANCE_RULERS.map(({ label, lineY, labelY, bandTop, bandBottom, color, fontSize }) => (
+          <div key={label} style={{ pointerEvents: "none" }}>
+            {/* Semi-transparent colored band */}
             <div
               style={{
-                flex: 1,
-                height: 1.5,
+                position: "absolute",
+                top: `${bandTop * 100}%`,
+                left: 0,
+                right: 0,
+                height: `${(bandBottom - bandTop) * 100}%`,
                 backgroundColor: color,
-                opacity: 0.85,
+                opacity: 0.3,
               }}
             />
-            {/* Label */}
-            <span
+            {/* Thin center line (stronger opacity) */}
+            <div
               style={{
+                position: "absolute",
+                top: `${lineY * 100}%`,
+                left: 0,
+                right: 0,
+                height: 2,
+                backgroundColor: color,
+                opacity: 0.9,
+              }}
+            />
+            {/* Label — bottom edge at labelY, text extends upward */}
+            <div
+              style={{
+                position: "absolute",
+                top: `${labelY * 100}%`,
+                left: "1.2%",
+                transform: "translateY(-100%)",
                 color,
-                fontSize: 22,
-                fontWeight: 600,
+                fontSize,
+                fontWeight: 400,
                 fontFamily: "Inter, system-ui, sans-serif",
-                padding: "0 8px",
-                letterSpacing: "0.01em",
-                textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+                lineHeight: "normal",
+                textShadow: "0 2px 8px rgba(0,0,0,0.67)",
               }}
             >
               {label}
-            </span>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Status text */}
+      {/* Status text below camera */}
       <div
         style={{
-          marginTop: 10,
-          fontSize: 28,
-          fontWeight: 500,
+          marginTop: "0.65vh",
+          fontSize: "2.5vw",
+          fontWeight: 400,
           fontFamily: "Inter, system-ui, sans-serif",
           color: statusColor,
-          textAlign: "center",
-          letterSpacing: "0.01em",
+          lineHeight: "normal",
+          textAlign: "left",
         }}
       >
         {statusText}

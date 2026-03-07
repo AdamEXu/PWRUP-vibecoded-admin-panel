@@ -11,11 +11,12 @@ interface Props {
 }
 
 /**
- * Displays below the header bar:
- *   [Icon]  17.94
- *                  19.94 with buffer   (shown only in warning state)
+ * Shift time indicator — absolutely centered at ~31vh.
  *
- * Shows nothing if outside a numbered shift.
+ * Figma layout (1920×1080):
+ *   Container: 938×239 centered at (960, 335.5) with -translate-50%
+ *   Content: all inline — [icon] [space] [integer] [.decimal]
+ *   Buffer text: separate absolute element above, aligned with numbers
  */
 export function ShiftIndicator({
   hubStatus,
@@ -27,47 +28,84 @@ export function ShiftIndicator({
   const inEndgame = matchPhase === "endgame";
   const inAuto = matchPhase === "autonomous";
 
-  // Show for shifts + endgame + auto (wherever there's meaningful time info)
   if (!inShift && !inEndgame && !inAuto) return null;
 
   const displayTime = inShift ? shiftTimeRemaining : 0;
-  const displayWithBuffer = inShift && hubStatus === "warning" ? shiftTimeWithBuffer : null;
+  const showBuffer = inShift && hubStatus === "warning";
 
   const timeStr = displayTime.toFixed(2);
-  const bufferStr = displayWithBuffer !== null ? displayWithBuffer.toFixed(2) : null;
+  const [intPart, decPart] = timeStr.split(".");
+
+  const bufferWithStr = showBuffer ? shiftTimeWithBuffer.toFixed(2) : null;
 
   return (
-    <div
-      className="absolute flex flex-col items-start gap-1"
-      style={{ top: 200, left: 80, zIndex: 10 }}
-    >
-      <div className="flex items-center gap-4">
-        <HubStatusIcon status={hubStatus} size={56} />
-        <span
-          className="text-white select-none leading-none"
-          style={{
-            fontFamily: "'Roboto Mono', monospace",
-            fontSize: 96,
-            fontWeight: 400,
-          }}
-        >
-          {timeStr}
-        </span>
-      </div>
-
-      {bufferStr !== null && (
+    <>
+      {/* Buffer text — positioned above the main indicator */}
+      {bufferWithStr !== null && (
         <div
-          className="text-white/60 select-none"
+          className="select-none"
           style={{
+            position: "absolute",
+            left: "50.78%",
+            top: "20.74vh",
             fontFamily: "'Roboto Mono', monospace",
-            fontSize: 38,
+            fontSize: "3.33vw",
             fontWeight: 400,
-            paddingLeft: 72, // align under the number
+            color: "white",
+            lineHeight: "normal",
           }}
         >
-          {bufferStr} with buffer
+          {bufferWithStr}
+          <span style={{ fontFamily: "Inter, system-ui, sans-serif" }}> with buffer</span>
         </div>
       )}
-    </div>
+
+      {/* Main indicator — icon + integer + .decimal, all inline */}
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: "31.07vh",
+          transform: "translate(-50%, -50%)",
+          width: "48.85vw",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          textAlign: "center",
+          lineHeight: 0,
+          fontSize: 0,
+        }}
+      >
+        <p>
+          <HubStatusIcon status={hubStatus} size="10.42vw" />
+          {/* Spacer between icon and number */}
+          <span style={{ display: "inline-block", width: "1vw" }} />
+          {/* Integer part — large */}
+          <span
+            className="text-white select-none"
+            style={{
+              fontFamily: "'Roboto Mono', monospace",
+              fontSize: "6.67vw",
+              fontWeight: 400,
+              lineHeight: "normal",
+            }}
+          >
+            {intPart}
+          </span>
+          {/* Decimal part — half size */}
+          <span
+            className="text-white select-none"
+            style={{
+              fontFamily: "'Roboto Mono', monospace",
+              fontSize: "3.33vw",
+              fontWeight: 400,
+              lineHeight: "normal",
+            }}
+          >
+            .{decPart}
+          </span>
+        </p>
+      </div>
+    </>
   );
 }

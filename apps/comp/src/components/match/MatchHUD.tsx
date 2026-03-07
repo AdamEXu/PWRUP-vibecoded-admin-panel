@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useMatchState } from "@/lib/match/useMatchState";
+import { useMockMatchState } from "@/lib/match/useMockMatchState";
 import { HeaderBar } from "./HeaderBar";
 import { ShiftIndicator } from "./ShiftIndicator";
 import { MiniMap } from "./MiniMap";
@@ -8,45 +10,32 @@ import { CameraOverlay } from "./CameraOverlay";
 import { ConnectionLost } from "./ConnectionLost";
 
 /**
- * Root match HUD component — the entire comp app UI.
+ * Root match HUD — fullscreen, purely reactive to NT data, no interaction.
  *
- * 1920×1080 absolute-positioned layout (designed for fullscreen Electron).
- * Purely reactive to NT data — no user interaction.
- *
- * Layout at 1920×1080:
- * ┌─────────────────────────────────────────────────────────────┐
- * │  HeaderBar (1920×180) — timer, alliance color / purple      │
- * │─────────────────────────────────────────────────────────────│
- * │  [Hub icon + shift timer + buffer text]  top-left           │
- * │                                                             │
- * │  MiniMap (840×600)           CameraOverlay (576×432)        │
- * │  bottom-left area            top-right (when auto-aligning) │
- * │                                                             │
- * │  [NT Disconnected]           bottom-left corner             │
- * └─────────────────────────────────────────────────────────────┘
+ * Layout (responsive via vw/vh):
+ *   Header bar (16.7vh) — timer centered, colored by alliance/phase
+ *   Body row:
+ *     Left col (43.75vw) — ShiftIndicator + MiniMap placeholder (flex-1)
+ *     Right (30vw)       — CameraOverlay (only when auto-aligning)
  */
 export function MatchHUD() {
-  const state = useMatchState();
+  const [isMock] = useState(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("mock")
+  );
+  const realState = useMatchState();
+  const mockState = useMockMatchState();
+  const state = isMock ? mockState : realState;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        width: "100vw",
-        height: "100vh",
-        backgroundColor: "#000",
-        overflow: "hidden",
-      }}
-    >
-      {/* ── 1. Header bar (timer + alliance color) ──────────────────────── */}
+    <div className="fixed inset-0 bg-black overflow-hidden">
+      {/* Header bar — colored strip + centered timer */}
       <HeaderBar
         headerColor={state.headerColor}
         fmsMatchTime={state.fmsMatchTime}
         totalTimeRemaining={state.totalTimeRemaining}
       />
 
-      {/* ── 2. Shift countdown + hub status icon ────────────────────────── */}
+      {/* Shift indicator — centered at ~31% down */}
       <ShiftIndicator
         hubStatus={state.hubStatus}
         matchPhase={state.matchPhase}
@@ -54,7 +43,7 @@ export function MatchHUD() {
         shiftTimeWithBuffer={state.shiftTimeWithBuffer}
       />
 
-      {/* ── 3. Field minimap with robot position ────────────────────────── */}
+      {/* Minimap — centered, 28.125% from left, fills to bottom */}
       <MiniMap
         poseX={state.robotPoseX}
         poseY={state.robotPoseY}
@@ -62,14 +51,13 @@ export function MatchHUD() {
         isRedAlliance={state.isRedAlliance}
       />
 
-      {/* ── 4. Auto-align camera overlay (only when active) ─────────────── */}
+      {/* Camera overlay — top-right, only when auto-aligning */}
       <CameraOverlay
         active={state.autoAlignActive}
         distanceToTarget={state.autoAlignDistance}
         isReady={state.autoAlignReady}
       />
 
-      {/* ── 5. NT connection lost indicator ─────────────────────────────── */}
       <ConnectionLost visible={!state.isConnected} />
     </div>
   );

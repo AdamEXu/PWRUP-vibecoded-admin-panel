@@ -71,14 +71,14 @@ export function MainTimer({ fmsMatchTime, totalTimeRemaining }: Props) {
     >
       <span
         ref={minSecRef}
-        style={{ fontSize: 128, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.02em" }}
+        style={{ fontSize: "6.7vw", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.02em" }}
       >
         {initialMinSec}
       </span>
       <span
         ref={csRef}
-        style={{ fontSize: 64, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.01em", marginLeft: 4 }}
-        className="text-white/70"
+        style={{ fontSize: "3.3vw", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.01em", marginLeft: "0.2vw" }}
+        className="text-white"
       >
         {initialCs}
       </span>
