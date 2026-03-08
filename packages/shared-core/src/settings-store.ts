@@ -1,8 +1,12 @@
 import os from "os";
 import path from "path";
 import { promises as fs } from "fs";
-import type { ConnectionSettings, SharedSettingsPayload } from "./settings-schema";
-import { DEFAULTS } from "./settings-schema";
+import type {
+  ConnectionSettings,
+  HudVisibilitySettings,
+  SharedSettingsPayload,
+} from "./settings-schema";
+import { DEFAULTS, DEFAULT_HUD_VISIBILITY } from "./settings-schema";
 
 function getSharedSettingsPath(): string {
   const fromEnv = process.env.PWRUP_SHARED_SETTINGS_PATH?.trim();
@@ -53,9 +57,29 @@ function normalizeSettings(next: Partial<ConnectionSettings>): ConnectionSetting
   };
 }
 
+function normalizeHudVisibility(next: Partial<HudVisibilitySettings> | undefined): HudVisibilitySettings {
+  return {
+    showMap:
+      typeof next?.showMap === "boolean" ? next.showMap : DEFAULT_HUD_VISIBILITY.showMap,
+    showTimers:
+      typeof next?.showTimers === "boolean"
+        ? next.showTimers
+        : DEFAULT_HUD_VISIBILITY.showTimers,
+    showStatus:
+      typeof next?.showStatus === "boolean"
+        ? next.showStatus
+        : DEFAULT_HUD_VISIBILITY.showStatus,
+    showCamera:
+      typeof next?.showCamera === "boolean"
+        ? next.showCamera
+        : DEFAULT_HUD_VISIBILITY.showCamera,
+  };
+}
+
 function normalizePayload(raw: unknown): SharedSettingsPayload {
   const parsed = raw as Partial<SharedSettingsPayload> | undefined;
   const normalizedSettings = normalizeSettings(parsed?.settings ?? DEFAULTS);
+  const normalizedHudVisibility = normalizeHudVisibility(parsed?.hudVisibility);
 
   const version =
     typeof parsed?.version === "number" && Number.isFinite(parsed.version) && parsed.version >= 1
@@ -71,6 +95,7 @@ function normalizePayload(raw: unknown): SharedSettingsPayload {
     version,
     updatedAtIso,
     settings: normalizedSettings,
+    hudVisibility: normalizedHudVisibility,
   };
 }
 
@@ -99,18 +124,23 @@ export async function readSharedSettings(): Promise<SharedSettingsPayload> {
       version: 1,
       updatedAtIso: new Date().toISOString(),
       settings: DEFAULTS,
+      hudVisibility: DEFAULT_HUD_VISIBILITY,
     };
     await writeAtomically(filePath, initial);
     return initial;
   }
 }
 
-export async function updateSharedSettings(next: ConnectionSettings): Promise<SharedSettingsPayload> {
+export async function updateSharedSettings(next: {
+  settings?: ConnectionSettings;
+  hudVisibility?: HudVisibilitySettings;
+}): Promise<SharedSettingsPayload> {
   const current = await readSharedSettings();
   const updated: SharedSettingsPayload = {
     version: current.version + 1,
     updatedAtIso: new Date().toISOString(),
-    settings: normalizeSettings(next),
+    settings: normalizeSettings(next.settings ?? current.settings),
+    hudVisibility: normalizeHudVisibility(next.hudVisibility ?? current.hudVisibility),
   };
 
   await writeAtomically(getSharedSettingsPath(), updated);

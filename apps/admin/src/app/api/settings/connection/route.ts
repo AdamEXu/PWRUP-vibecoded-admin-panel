@@ -3,13 +3,17 @@ import {
   readSharedSettings,
   updateSharedSettings,
 } from "@pwrup/shared-core/settings-store";
-import type { ConnectionSettings } from "@pwrup/shared-core/settings-schema";
+import type {
+  ConnectionSettings,
+  HudVisibilitySettings,
+} from "@pwrup/shared-core/settings-schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface UpdateSettingsRequestBody {
   settings?: ConnectionSettings;
+  hudVisibility?: HudVisibilitySettings;
 }
 
 export async function GET() {
@@ -25,11 +29,17 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = (await request.json()) as UpdateSettingsRequestBody;
-    if (!body.settings || typeof body.settings !== "object") {
+    const hasSettings = !!body.settings && typeof body.settings === "object";
+    const hasHudVisibility = !!body.hudVisibility && typeof body.hudVisibility === "object";
+
+    if (!hasSettings && !hasHudVisibility) {
       return NextResponse.json({ message: "Missing settings payload." }, { status: 400 });
     }
 
-    const payload = await updateSharedSettings(body.settings);
+    const payload = await updateSharedSettings({
+      settings: hasSettings ? body.settings : undefined,
+      hudVisibility: hasHudVisibility ? body.hudVisibility : undefined,
+    });
     return NextResponse.json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to persist shared settings.";

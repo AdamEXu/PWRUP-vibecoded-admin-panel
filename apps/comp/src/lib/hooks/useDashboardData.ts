@@ -1,34 +1,59 @@
 // src/lib/hooks/useDashboardData.ts - Purpose: single-Pi dashboard data stream
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { useSubscription } from "@/lib/useSubscription";
+import { useState, useCallback, useEffect } from "react";
 import {
   PiStatus,
   LogMessage,
   StatusType,
   StatusBase,
 } from "@pwrup/shared-proto/status/PiStatus";
-import { Address, AutobahnClient } from "autobahn-client";
-import { useSettings } from "@/lib/settings";
+import {
+  getBridge,
+  hasBridge,
+  subscribeAutobahnStatus,
+  subscribeAutobahnTopic,
+} from "@/lib/blitzRenderer";
+
+const DASHBOARD_TOPIC = "tripoli/logs";
 
 export function useDashboardData() {
-  const { settings } = useSettings();
-  const client = useMemo(
-    () => new AutobahnClient(new Address(settings.host, settings.port)),
-    [settings.host, settings.port]
-  );
   const [piStats, setPiStats] = useState<PiStatus | null>(null);
   const [logMessages, setLogMessages] = useState<LogMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    client.begin();
-    setIsConnected(true);
-    return () => {
+    if (!hasBridge()) {
       setIsConnected(false);
+      return;
+    }
+
+    let disposed = false;
+    const unsubscribe = subscribeAutobahnStatus((connected) => {
+      if (!disposed) {
+        setIsConnected(connected);
+      }
+    });
+
+    void getBridge()
+      .autobahn
+      .getStatus()
+      .then((connected) => {
+        if (!disposed) {
+          setIsConnected(connected);
+        }
+      })
+      .catch(() => {
+        if (!disposed) {
+          setIsConnected(false);
+        }
+      });
+
+    return () => {
+      disposed = true;
+      unsubscribe();
     };
-  }, [client]);
+  }, []);
 
   const handleStatusMessage = useCallback(async (payload: Uint8Array) => {
     try {
@@ -49,11 +74,36 @@ export function useDashboardData() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!hasBridge()) {
+      return;
+    }
+
+    let disposed = false;
+    let unsubscribe = () => {};
+
+    void subscribeAutobahnTopic(DASHBOARD_TOPIC, async (update) => {
+      if (disposed || !update.payload) {
+        return;
+      }
+      await handleStatusMessage(update.payload);
+    }).then((cleanup) => {
+      if (disposed) {
+        cleanup();
+        return;
+      }
+      unsubscribe = cleanup;
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, [handleStatusMessage]);
+
   const clearLogs = useCallback(() => {
     setLogMessages([]);
   }, []);
-
-  useSubscription("tripoli/logs", handleStatusMessage, client);
 
   return {
     piStats,

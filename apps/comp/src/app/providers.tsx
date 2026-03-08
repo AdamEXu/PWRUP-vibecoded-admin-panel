@@ -1,6 +1,6 @@
 "use client";
 
-import { SettingsProvider } from "@pwrup/shared-core/settings";
+import { SettingsProvider } from "@/lib/settings";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return <SettingsProvider>{children}</SettingsProvider>;

@@ -1,0 +1,255 @@
+const { EventEmitter } = require("events");
+const { NetworkTables } = require("ntcore-ts-client");
+
+class NtBroker extends EventEmitter {
+  constructor() {
+    super();
+    this.snapshot = null;
+    this.client = null;
+    this.clientKey = "";
+    this.removeConnectionListener = null;
+    this.isConnected = false;
+    this.nextSubscriptionId = 1;
+    this.subscriptions = new Map();
+    this.topicEntries = new Map();
+    this.publisherEntries = new Map();
+  }
+
+  initialize(snapshot) {
+    this.snapshot = snapshot;
+    this.#ensureClient();
+  }
+
+  updateSettingsSnapshot(snapshot) {
+    this.snapshot = snapshot;
+    this.#rebindClient();
+  }
+
+  subscribe(sender, params) {
+    const subscriptionId = this.nextSubscriptionId++;
+    const entry = this.#ensureTopicEntry(params);
+    entry.subscribers.set(subscriptionId, sender);
+    this.subscriptions.set(subscriptionId, {
+      senderId: sender.id,
+      topicPath: params.topicPath,
+    });
+
+    this.#bindTopicEntry(entry);
+
+    return {
+      subscriptionId,
+      initial: {
+        subscriptionId,
+        topicPath: entry.topicPath,
+        value: entry.hasValue ? entry.lastValue : entry.defaultValue,
+        hasValue: entry.hasValue,
+        isConnected: this.isConnected,
+      },
+    };
+  }
+
+  unsubscribe(subscriptionId) {
+    const meta = this.subscriptions.get(subscriptionId);
+    if (!meta) return;
+
+    this.subscriptions.delete(subscriptionId);
+    const entry = this.topicEntries.get(meta.topicPath);
+    if (!entry) return;
+
+    entry.subscribers.delete(subscriptionId);
+
+    if (entry.subscribers.size === 0) {
+      if (entry.topic && entry.subUid !== null) {
+        entry.topic.unsubscribe(entry.subUid);
+      }
+      this.topicEntries.delete(meta.topicPath);
+    }
+  }
+
+  cleanupRenderer(senderId) {
+    const subscriptionIds = [];
+    this.subscriptions.forEach((meta, subscriptionId) => {
+      if (meta.senderId === senderId) {
+        subscriptionIds.push(subscriptionId);
+      }
+    });
+
+    subscriptionIds.forEach((subscriptionId) => this.unsubscribe(subscriptionId));
+  }
+
+  async publish(params) {
+    this.#ensureClient();
+
+    if (!this.client || !this.isConnected) {
+      throw new Error("NetworkTables is not connected.");
+    }
+
+    const key = params.topicPath;
+    let publisher = this.publisherEntries.get(key);
+
+    if (!publisher) {
+      publisher = {
+        topic: this.client.createTopic(params.topicPath, params.typeInfo, params.defaultValue),
+        publishPromise: null,
+      };
+      this.publisherEntries.set(key, publisher);
+    }
+
+    if (!publisher.publishPromise) {
+      publisher.publishPromise = publisher.topic.publish().catch((error) => {
+        publisher.publishPromise = null;
+        throw error;
+      });
+    }
+
+    await publisher.publishPromise;
+    publisher.topic.setValue(params.value);
+  }
+
+  stop() {
+    this.topicEntries.forEach((entry) => {
+      if (entry.topic && entry.subUid !== null) {
+        entry.topic.unsubscribe(entry.subUid);
+      }
+    });
+    this.topicEntries.clear();
+    this.publisherEntries.clear();
+    this.subscriptions.clear();
+
+    if (this.removeConnectionListener) {
+      this.removeConnectionListener();
+      this.removeConnectionListener = null;
+    }
+
+    this.client = null;
+    this.clientKey = "";
+    this.isConnected = false;
+  }
+
+  #ensureTopicEntry(params) {
+    let entry = this.topicEntries.get(params.topicPath);
+    if (!entry) {
+      entry = {
+        topicPath: params.topicPath,
+        typeInfo: params.typeInfo,
+        defaultValue: params.defaultValue,
+        topic: null,
+        subUid: null,
+        lastValue: params.defaultValue,
+        hasValue: false,
+        subscribers: new Map(),
+      };
+      this.topicEntries.set(params.topicPath, entry);
+    }
+    return entry;
+  }
+
+  #ensureClient() {
+    const host = this.snapshot?.settings?.networkTables?.host?.trim() ?? "";
+    const port = this.snapshot?.settings?.networkTables?.port ?? 5810;
+    const nextKey = host ? `${host}:${port}` : "";
+
+    if (!host) {
+      this.#setConnectionState(false);
+      return;
+    }
+
+    if (this.client && this.clientKey === nextKey) {
+      return;
+    }
+
+    if (this.removeConnectionListener) {
+      this.removeConnectionListener();
+      this.removeConnectionListener = null;
+    }
+
+    this.client = NetworkTables.getInstanceByURI(host, port);
+    this.clientKey = nextKey;
+    this.publisherEntries.clear();
+    this.removeConnectionListener = this.client.addRobotConnectionListener((connected) => {
+      this.#setConnectionState(connected);
+    }, true);
+  }
+
+  #rebindClient() {
+    this.topicEntries.forEach((entry) => {
+      if (entry.topic && entry.subUid !== null) {
+        entry.topic.unsubscribe(entry.subUid);
+      }
+      entry.topic = null;
+      entry.subUid = null;
+    });
+
+    this.publisherEntries.clear();
+    this.client = null;
+    this.clientKey = "";
+
+    if (this.removeConnectionListener) {
+      this.removeConnectionListener();
+      this.removeConnectionListener = null;
+    }
+
+    this.#ensureClient();
+
+    this.topicEntries.forEach((entry) => {
+      this.#bindTopicEntry(entry);
+    });
+
+    if (!this.client) {
+      this.#setConnectionState(false);
+    }
+  }
+
+  #bindTopicEntry(entry) {
+    this.#ensureClient();
+
+    if (!this.client || entry.topic) {
+      return;
+    }
+
+    const topic = this.client.createTopic(entry.topicPath, entry.typeInfo, entry.defaultValue);
+    const subUid = topic.subscribe((nextValue) => {
+      if (nextValue === null || nextValue === undefined) {
+        return;
+      }
+
+      entry.lastValue = nextValue;
+      entry.hasValue = true;
+      this.#broadcastEntry(entry);
+    });
+
+    entry.topic = topic;
+    entry.subUid = subUid;
+  }
+
+  #setConnectionState(connected) {
+    if (this.isConnected === connected) {
+      this.topicEntries.forEach((entry) => this.#broadcastEntry(entry));
+      return;
+    }
+
+    this.isConnected = connected;
+    this.topicEntries.forEach((entry) => this.#broadcastEntry(entry));
+  }
+
+  #broadcastEntry(entry) {
+    entry.subscribers.forEach((sender, subscriptionId) => {
+      if (!sender || sender.isDestroyed()) {
+        this.unsubscribe(subscriptionId);
+        return;
+      }
+
+      sender.send("blitz:nt:update", {
+        subscriptionId,
+        topicPath: entry.topicPath,
+        value: entry.hasValue ? entry.lastValue : entry.defaultValue,
+        hasValue: entry.hasValue,
+        isConnected: this.isConnected,
+      });
+    });
+  }
+}
+
+module.exports = {
+  NtBroker,
+};

@@ -11,10 +11,18 @@ export interface ConnectionSettings {
   networkTables: NetworkTablesSettings;
 }
 
+export interface HudVisibilitySettings {
+  showMap: boolean;
+  showTimers: boolean;
+  showStatus: boolean;
+  showCamera: boolean;
+}
+
 export interface SharedSettingsPayload {
   version: number;
   updatedAtIso: string;
   settings: ConnectionSettings;
+  hudVisibility: HudVisibilitySettings;
 }
 
 export const DEFAULTS: ConnectionSettings = {
@@ -26,6 +34,13 @@ export const DEFAULTS: ConnectionSettings = {
     sharedTable: "PathPlanner",
     selectedPathTopic: "SelectedPath",
   },
+};
+
+export const DEFAULT_HUD_VISIBILITY: HudVisibilitySettings = {
+  showMap: true,
+  showTimers: true,
+  showStatus: true,
+  showCamera: true,
 };
 
 export function frcTeamToRobotIp(teamNumber: number, lastOctet = 2): string {

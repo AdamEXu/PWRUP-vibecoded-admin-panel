@@ -1,59 +1,68 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { NetworkTables, type NetworkTablesTypeInfo } from "ntcore-ts-client";
-import { useSettings } from "@/lib/settings";
+import type {
+  NetworkTablesTypeInfo,
+  NetworkTablesTypes,
+} from "ntcore-ts-client";
+import { hasBridge, subscribeNtTopic } from "@/lib/blitzRenderer";
 
 /**
  * Generic, single-topic NetworkTables subscription hook.
  *
- * Follows the same lifecycle pattern as usePathNetworkTable:
- *   - Connects via singleton NT instance (shared with other hooks)
- *   - Tracks connection state
- *   - On disconnect: keeps the last received value (no blanking)
- *   - Cleans up subscription and listener on unmount / setting change
+ * In Electron runtime, subscriptions are owned by the main-process bridge so
+ * both visible windows share one upstream NT connection.
  */
-export function useNTopic<T>(
+export function useNTopic<T extends NetworkTablesTypes>(
   topicPath: string,
   typeInfo: NetworkTablesTypeInfo,
   defaultValue: T,
 ): { value: T; isConnected: boolean } {
-  const { settings } = useSettings();
   const [value, setValue] = useState<T>(defaultValue);
   const [isConnected, setIsConnected] = useState(false);
-
-  // Keep a ref to the latest value so we don't reset on disconnect
   const lastValueRef = useRef<T>(defaultValue);
 
-  const robotIp = settings.networkTables.host.trim();
-  const port = settings.networkTables.port;
-
   useEffect(() => {
-    if (!robotIp) {
+    if (!hasBridge()) {
       setIsConnected(false);
       return;
     }
 
-    const nt = NetworkTables.getInstanceByURI(robotIp, port);
-    const topic = nt.createTopic<T>(topicPath, typeInfo, defaultValue);
+    let disposed = false;
+    let unsubscribe = () => {};
 
-    const removeListener = nt.addRobotConnectionListener((connected) => {
-      setIsConnected(connected);
-      // Don't reset value on disconnect — keep last known state
-    }, true);
+    void subscribeNtTopic<T>(
+      {
+        topicPath,
+        typeInfo,
+        defaultValue,
+      },
+      (update) => {
+        if (disposed) {
+          return;
+        }
 
-    const subUid = topic.subscribe((next) => {
-      if (next === null || next === undefined) return;
-      lastValueRef.current = next;
-      setValue(next);
+        setIsConnected(update.isConnected);
+        if (update.hasValue) {
+          lastValueRef.current = update.value;
+          setValue(update.value);
+        } else {
+          setValue(lastValueRef.current);
+        }
+      },
+    ).then((cleanup) => {
+      if (disposed) {
+        cleanup();
+        return;
+      }
+      unsubscribe = cleanup;
     });
 
     return () => {
-      removeListener();
-      topic.unsubscribe(subUid);
+      disposed = true;
+      unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [robotIp, port, topicPath]);
+  }, [defaultValue, topicPath, typeInfo]);
 
   return { value, isConnected };
 }

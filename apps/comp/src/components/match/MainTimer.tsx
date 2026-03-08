@@ -66,7 +66,7 @@ export function MainTimer({ fmsMatchTime, totalTimeRemaining }: Props) {
 
   return (
     <div
-      className="flex items-end justify-center select-none"
+      className="flex items-baseline justify-center select-none"
       style={{
         width: "48.85vw",
         textAlign: "center",

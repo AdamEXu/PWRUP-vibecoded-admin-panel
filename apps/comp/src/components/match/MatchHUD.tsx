@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSettings } from "@/lib/settings";
 import { useMatchState } from "@/lib/match/useMatchState";
 import { useMockMatchState } from "@/lib/match/useMockMatchState";
 import { HeaderBar } from "./HeaderBar";
@@ -22,6 +23,7 @@ export function MatchHUD() {
   const [isMock] = useState(() =>
     typeof window !== "undefined" && new URLSearchParams(window.location.search).has("mock")
   );
+  const { hudVisibility } = useSettings();
   const realState = useMatchState();
   const mockState = useMockMatchState();
   const state = isMock ? mockState : realState;
@@ -29,39 +31,47 @@ export function MatchHUD() {
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
       {/* Header bar — colored strip + centered timer */}
-      <HeaderBar
-        headerColor={state.headerColor}
-        fmsMatchTime={state.fmsMatchTime}
-        totalTimeRemaining={state.totalTimeRemaining}
-      />
+      {hudVisibility.showTimers && (
+        <HeaderBar
+          headerColor={state.headerColor}
+          fmsMatchTime={state.fmsMatchTime}
+          totalTimeRemaining={state.totalTimeRemaining}
+        />
+      )}
 
       {/* Shift indicator — centered at ~31% down */}
-      <ShiftIndicator
-        hubStatus={state.hubStatus}
-        matchPhase={state.matchPhase}
-        periodTimeRemaining={state.fmsMatchTime}
-        shiftTimeRemaining={state.shiftTimeRemaining}
-        shiftTimeWithBuffer={state.shiftTimeWithBuffer}
-        bufferRemaining={state.bufferRemaining}
-        showBuffer={state.showBuffer}
-        showShiftIndicator={state.showShiftIndicator}
-      />
+      {hudVisibility.showStatus && (
+        <ShiftIndicator
+          hubStatus={state.hubStatus}
+          matchPhase={state.matchPhase}
+          periodTimeRemaining={state.fmsMatchTime}
+          shiftTimeRemaining={state.shiftTimeRemaining}
+          shiftTimeWithBuffer={state.shiftTimeWithBuffer}
+          bufferRemaining={state.bufferRemaining}
+          showBuffer={state.showBuffer}
+          showShiftIndicator={state.showShiftIndicator}
+        />
+      )}
 
       {/* Minimap — centered, 28.125% from left, fills to bottom */}
-      <MiniMap
-        poseX={state.robotPoseX}
-        poseY={state.robotPoseY}
-        heading={state.robotHeading}
-        isRedAlliance={state.isRedAlliance}
-      />
+      {hudVisibility.showMap && (
+        <MiniMap
+          poseX={state.robotPoseX}
+          poseY={state.robotPoseY}
+          heading={state.robotHeading}
+          isRedAlliance={state.isRedAlliance}
+        />
+      )}
 
       {/* Camera overlay — top-right, only when auto-aligning */}
-      <CameraOverlay
-        active={state.autoAlignActive}
-        distanceToTarget={state.autoAlignDistance}
-        isReady={state.autoAlignReady}
-        cameraTopic={state.cameraTopic}
-      />
+      {hudVisibility.showCamera && (
+        <CameraOverlay
+          active={state.autoAlignActive}
+          distanceToTarget={state.autoAlignDistance}
+          isReady={state.autoAlignReady}
+          cameraTopic={state.cameraTopic}
+        />
+      )}
 
       <ConnectionLost visible={!state.isConnected} />
     </div>

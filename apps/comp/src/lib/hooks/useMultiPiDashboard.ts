@@ -2,14 +2,13 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { Address, AutobahnClient } from "autobahn-client";
 import {
   PiStatus,
   LogMessage,
   StatusType,
   StatusBase,
 } from "@pwrup/shared-proto/status/PiStatus";
-import { useSettings } from "@/lib/settings";
+import { hasBridge, subscribeAutobahnStatus, subscribeAutobahnTopic } from "@/lib/blitzRenderer";
 
 export interface PiSystemData {
   name: string;
@@ -31,80 +30,42 @@ export interface GlobalStats {
 const DEFAULT_TOPIC = "pi-technical-log";
 
 export function useMultiPiDashboard() {
-  const { settings } = useSettings();
-  const client = useMemo(
-    () => new AutobahnClient(new Address(settings.host, settings.port)),
-    [settings.host, settings.port]
-  );
-  const [piSystems, setPiSystems] = useState<Map<string, PiSystemData>>(
-    new Map()
-  );
+  const [piSystems, setPiSystems] = useState<Map<string, PiSystemData>>(new Map());
   const [topic, setTopic] = useState<string>(DEFAULT_TOPIC);
   const [isConnected, setIsConnected] = useState(false);
-  const logSubscriptionRef = useRef<string | null>(null);
-  const statsSubscriptionRef = useRef<string | null>(null);
-  // Track intentionally removed Pi systems to ignore their messages
   const removedPiSystemsRef = useRef<Set<string>>(new Set());
 
-  // Initialize connection and track connection state
   useEffect(() => {
-    let cancelled = false;
+    if (!hasBridge()) {
+      setIsConnected(false);
+      return;
+    }
 
-    const checkConnection = () => {
-      if (cancelled) return;
-      const connected = client.isConnected();
-      setIsConnected(connected);
-      return connected;
-    };
+    let disposed = false;
+    const unsubscribe = subscribeAutobahnStatus((connected) => {
+      if (!disposed) {
+        setIsConnected(connected);
+      }
+    });
 
-    // Start connection
-    client.begin();
-
-    // Check immediately
-    checkConnection();
-
-    // Poll connection state periodically
-    const intervalId = setInterval(() => {
-      if (cancelled) return;
-      checkConnection();
-    }, 500); // Check every 500ms to track connection state changes
-
-    // Cleanup
     return () => {
-      cancelled = true;
-      clearInterval(intervalId);
+      disposed = true;
+      unsubscribe();
     };
-  }, [client]);
+  }, []);
 
   const handleLogMessage = useCallback(async (payload: Uint8Array) => {
     try {
-      console.log(
-        "[Dashboard] Received message on log topic, size:",
-        payload.length
-      );
       const baseMessage = StatusBase.decode(payload);
-      console.log("[Dashboard] Decoded base message, type:", baseMessage.type);
 
       if (baseMessage.type !== StatusType.LOG_MESSAGE) {
-        console.warn(
-          "[Dashboard] Message is not LOG_MESSAGE, type:",
-          baseMessage.type
-        );
         return;
       }
 
       const logMsg = LogMessage.decode(payload);
       const piName = logMsg.piName || null;
-      console.log("[Dashboard] Decoded log message from pi:", piName);
 
-      if (!piName) {
-        console.warn("Received LOG_MESSAGE without pi_name");
-        return;
-      }
-
-      // Ignore messages from intentionally removed Pi systems
-      if (removedPiSystemsRef.current.has(piName)) {
-        console.log("[Dashboard] Ignoring message from removed pi:", piName);
+      if (!piName || removedPiSystemsRef.current.has(piName)) {
         return;
       }
 
@@ -135,33 +96,16 @@ export function useMultiPiDashboard() {
 
   const handleStatsMessage = useCallback(async (payload: Uint8Array) => {
     try {
-      console.log(
-        "[Dashboard] Received message on stats topic, size:",
-        payload.length
-      );
       const baseMessage = StatusBase.decode(payload);
-      console.log("[Dashboard] Decoded base message, type:", baseMessage.type);
 
       if (baseMessage.type !== StatusType.SYSTEM_STATUS) {
-        console.warn(
-          "[Dashboard] Message is not SYSTEM_STATUS, type:",
-          baseMessage.type
-        );
         return;
       }
 
       const status = PiStatus.decode(payload);
       const piName = status.piName || null;
-      console.log("[Dashboard] Decoded status message from pi:", piName);
 
-      if (!piName) {
-        console.warn("Received SYSTEM_STATUS message without pi_name");
-        return;
-      }
-
-      // Ignore messages from intentionally removed Pi systems
-      if (removedPiSystemsRef.current.has(piName)) {
-        console.log("[Dashboard] Ignoring message from removed pi:", piName);
+      if (!piName || removedPiSystemsRef.current.has(piName)) {
         return;
       }
 
@@ -189,103 +133,53 @@ export function useMultiPiDashboard() {
     }
   }, []);
 
-  // Subscribe to both log topic and stats topic (only when connected)
   useEffect(() => {
-    if (!topic.trim()) {
+    if (!topic.trim() || !hasBridge()) {
       return;
     }
 
-    // Wait for connection before subscribing
-    if (!isConnected) {
-      console.log("[Dashboard] Waiting for connection before subscribing...");
-      return;
-    }
+    let disposed = false;
+    let unsubscribeLogs = () => {};
+    let unsubscribeStats = () => {};
 
-    const logTopic = topic;
-    const statsTopic = `${topic}/stats`;
-
-    console.log(
-      "[Dashboard] Subscribing to topics - logs:",
-      logTopic,
-      "stats:",
-      statsTopic
-    );
-
-    // Unsubscribe from previous topics if they exist
-    if (logSubscriptionRef.current) {
-      try {
-        client.unsubscribe(logSubscriptionRef.current);
-      } catch {
-        // Ignore unsubscribe errors
+    void subscribeAutobahnTopic(topic, async (update) => {
+      if (disposed || !update.payload) {
+        return;
       }
-      logSubscriptionRef.current = null;
-    }
-    if (statsSubscriptionRef.current) {
-      try {
-        client.unsubscribe(statsSubscriptionRef.current);
-      } catch {
-        // Ignore unsubscribe errors
+      await handleLogMessage(update.payload);
+    }).then((cleanup) => {
+      if (disposed) {
+        cleanup();
+        return;
       }
-      statsSubscriptionRef.current = null;
-    }
+      unsubscribeLogs = cleanup;
+    });
 
-    // Verify connection is still active before subscribing
-    if (!client.isConnected()) {
-      console.warn(
-        "[Dashboard] Connection not active, will retry when reconnected"
-      );
-      return;
-    }
-
-    // Subscribe to log topic (for LogMessage)
-    try {
-      console.log("[Dashboard] Subscribing to log topic:", logTopic);
-      client.subscribe(logTopic, handleLogMessage);
-      logSubscriptionRef.current = logTopic;
-      console.log("[Dashboard] ✓ Subscribed to log topic:", logTopic);
-    } catch (error) {
-      console.error("[Dashboard] ✗ Failed to subscribe to log topic:", error);
-      logSubscriptionRef.current = null;
-    }
-
-    // Subscribe to stats topic (for PiStatus)
-    try {
-      console.log("[Dashboard] Subscribing to stats topic:", statsTopic);
-      client.subscribe(statsTopic, handleStatsMessage);
-      statsSubscriptionRef.current = statsTopic;
-      console.log("[Dashboard] ✓ Subscribed to stats topic:", statsTopic);
-    } catch (error) {
-      console.error("[Dashboard] ✗ Failed to subscribe to stats topic:", error);
-      statsSubscriptionRef.current = null;
-    }
+    void subscribeAutobahnTopic(`${topic}/stats`, async (update) => {
+      if (disposed || !update.payload) {
+        return;
+      }
+      await handleStatsMessage(update.payload);
+    }).then((cleanup) => {
+      if (disposed) {
+        cleanup();
+        return;
+      }
+      unsubscribeStats = cleanup;
+    });
 
     return () => {
-      if (logSubscriptionRef.current) {
-        try {
-          client.unsubscribe(logSubscriptionRef.current);
-        } catch {
-          // Ignore unsubscribe errors
-        }
-        logSubscriptionRef.current = null;
-      }
-      if (statsSubscriptionRef.current) {
-        try {
-          client.unsubscribe(statsSubscriptionRef.current);
-        } catch {
-          // Ignore unsubscribe errors
-        }
-        statsSubscriptionRef.current = null;
-      }
+      disposed = true;
+      unsubscribeLogs();
+      unsubscribeStats();
     };
-  }, [topic, client, handleLogMessage, handleStatsMessage, isConnected]);
+  }, [handleLogMessage, handleStatsMessage, topic]);
 
   const addPiSystem = useCallback((piName: string) => {
     if (!piName.trim()) return;
 
-    // Remove from the removed list if it was previously removed
     removedPiSystemsRef.current.delete(piName);
 
-    // Initialize Pi system data if it doesn't exist
     setPiSystems((prev) => {
       const updated = new Map(prev);
       if (!updated.has(piName)) {
@@ -302,7 +196,6 @@ export function useMultiPiDashboard() {
   }, []);
 
   const removePiSystem = useCallback((piName: string) => {
-    // Add to the removed list to ignore future messages
     removedPiSystemsRef.current.add(piName);
 
     setPiSystems((prev) => {
@@ -325,27 +218,23 @@ export function useMultiPiDashboard() {
 
   const globalStats: GlobalStats = useMemo(() => {
     const systems = Array.from(piSystems.values());
-    const activeSystems = systems.filter((s) => s.status && s.isConnected);
+    const activeSystems = systems.filter((system) => system.status && system.isConnected);
 
-    const average = (arr: number[]) =>
-      arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const average = (values: number[]) =>
+      values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 
     return {
       totalPis: systems.length,
       activePis: activeSystems.length,
-      avgCpuUsage: average(
-        activeSystems.map((s) => s.status?.cpuUsageTotal || 0)
-      ),
-      avgMemoryUsage: average(
-        activeSystems.map((s) => s.status?.memoryUsage || 0)
-      ),
+      avgCpuUsage: average(activeSystems.map((system) => system.status?.cpuUsageTotal || 0)),
+      avgMemoryUsage: average(activeSystems.map((system) => system.status?.memoryUsage || 0)),
       totalNetworkIn: activeSystems.reduce(
-        (sum, s) => sum + (s.status?.netUsageIn || 0),
-        0
+        (sum, system) => sum + (system.status?.netUsageIn || 0),
+        0,
       ),
       totalNetworkOut: activeSystems.reduce(
-        (sum, s) => sum + (s.status?.netUsageOut || 0),
-        0
+        (sum, system) => sum + (system.status?.netUsageOut || 0),
+        0,
       ),
     };
   }, [piSystems]);
