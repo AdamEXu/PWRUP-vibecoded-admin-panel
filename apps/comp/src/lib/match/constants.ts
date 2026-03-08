@@ -32,20 +32,34 @@ export const HUB_BUFFER_S = 3;
 export const SHIFT_DURATION_S = 25;
 
 // ─── NetworkTables Topic Paths ────────────────────────────────────────────────
+const MATCH_HUD_ROOT = "/matchhud/state";
+
 export const NT = {
-  FMS_IS_RED_ALLIANCE: "/FMSInfo/IsRedAlliance",
-  FMS_GAME_SPECIFIC: "/FMSInfo/GameSpecificMessage",
-  FMS_MATCH_TIME: "/FMSInfo/MatchTime",
-  FMS_CONTROL_DATA: "/FMSInfo/FMSControlData",
-
-  POSE_X: "/MatchHUD/RobotPoseX",
-  POSE_Y: "/MatchHUD/RobotPoseY",
-  POSE_HEADING: "/MatchHUD/RobotHeading",
-
-  AUTO_ALIGN_ACTIVE: "/MatchHUD/AutoAlignActive",
-  AUTO_ALIGN_DISTANCE: "/MatchHUD/AutoAlignDistance",
-  AUTO_ALIGN_READY: "/MatchHUD/AutoAlignReady",
-  DRIVER_OVERRIDE: "/MatchHUD/DriverOverride",
+  MATCH_HUD_SEQ: `${MATCH_HUD_ROOT}/seq`,
+  MATCH_HUD_CONNECTED: `${MATCH_HUD_ROOT}/connected`,
+  MATCH_HUD_IS_RED_ALLIANCE: `${MATCH_HUD_ROOT}/is_red_alliance`,
+  MATCH_HUD_ENABLED: `${MATCH_HUD_ROOT}/enabled`,
+  MATCH_HUD_AUTONOMOUS: `${MATCH_HUD_ROOT}/autonomous`,
+  MATCH_HUD_GAME_SPECIFIC: `${MATCH_HUD_ROOT}/game_specific_message`,
+  MATCH_HUD_PHASE: `${MATCH_HUD_ROOT}/match_phase`,
+  MATCH_HUD_HUB_STATUS: `${MATCH_HUD_ROOT}/hub_status`,
+  MATCH_HUD_HEADER_COLOR: `${MATCH_HUD_ROOT}/header_color`,
+  MATCH_HUD_TOTAL_TIME: `${MATCH_HUD_ROOT}/total_time_remaining_s`,
+  MATCH_HUD_PERIOD_TIME: `${MATCH_HUD_ROOT}/period_time_remaining_s`,
+  MATCH_HUD_SHIFT_TIME: `${MATCH_HUD_ROOT}/shift_time_remaining_s`,
+  MATCH_HUD_SHIFT_WITH_BUFFER: `${MATCH_HUD_ROOT}/shift_time_with_buffer_s`,
+  MATCH_HUD_BUFFER_REMAINING: `${MATCH_HUD_ROOT}/buffer_remaining_s`,
+  MATCH_HUD_SHOW_SHIFT_INDICATOR: `${MATCH_HUD_ROOT}/show_shift_indicator`,
+  MATCH_HUD_SHOW_BUFFER: `${MATCH_HUD_ROOT}/show_buffer`,
+  MATCH_HUD_POSE_X: `${MATCH_HUD_ROOT}/robot_pose_x_m`,
+  MATCH_HUD_POSE_Y: `${MATCH_HUD_ROOT}/robot_pose_y_m`,
+  MATCH_HUD_HEADING: `${MATCH_HUD_ROOT}/robot_heading_rad`,
+  MATCH_HUD_POSE_VALID: `${MATCH_HUD_ROOT}/robot_pose_valid`,
+  MATCH_HUD_AUTO_ALIGN_ACTIVE: `${MATCH_HUD_ROOT}/auto_align_active`,
+  MATCH_HUD_AUTO_ALIGN_DISTANCE: `${MATCH_HUD_ROOT}/auto_align_distance_m`,
+  MATCH_HUD_AUTO_ALIGN_READY: `${MATCH_HUD_ROOT}/auto_align_ready`,
+  MATCH_HUD_DRIVER_OVERRIDE: `${MATCH_HUD_ROOT}/driver_override`,
+  MATCH_HUD_CAMERA_TOPIC: `${MATCH_HUD_ROOT}/camera_topic`,
 } as const;
 
 // ─── FMSControlData bitmask ───────────────────────────────────────────────────
@@ -67,6 +81,3 @@ export const COLOR_YELLOW = "#ffd900";
 
 // ─── Autobahn camera topic for auto-align overlay ────────────────────────────
 export const CAMERA_ALIGN_TOPIC = "camera/front_left/video";
-
-// ─── Autobahn MatchHUD topic ──────────────────────────────────────────────────
-export const MATCH_HUD_TOPIC = "matchhud/state";
