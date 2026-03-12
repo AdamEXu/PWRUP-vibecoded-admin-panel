@@ -9,6 +9,7 @@ import {
   PointerSensor,
   TouchSensor,
   closestCenter,
+  useDroppable,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -56,8 +57,47 @@ const RIGHT_PANELS: RightPanelDef[] = [
   { id: "showCamera", label: "Camera", symbol: "􀌞", activeSymbol: "􀌟" },
 ];
 
-const PLACEHOLDER_SYMBOL = "􀷖";
-const TOTAL_DOCK_SLOTS = 15;
+// ─── DnD ID helpers ──────────────────────────────────────────────────────────
+
+const RAIL_PREFIX = "rail-";
+const DOCK_PREFIX = "dock-";
+
+function railId(tabId: OverlayTabId): string {
+  return `${RAIL_PREFIX}${tabId}`;
+}
+
+function dockId(tabId: string): string {
+  return `${DOCK_PREFIX}${tabId}`;
+}
+
+function parseId(prefixedId: string): { zone: "rail" | "dock"; tabId: string } | null {
+  if (prefixedId.startsWith(RAIL_PREFIX)) {
+    return { zone: "rail", tabId: prefixedId.slice(RAIL_PREFIX.length) };
+  }
+  if (prefixedId.startsWith(DOCK_PREFIX)) {
+    return { zone: "dock", tabId: prefixedId.slice(DOCK_PREFIX.length) };
+  }
+  return null;
+}
+
+// ─── Droppable zone wrapper ──────────────────────────────────────────────────
+
+function DroppableZone({
+  id,
+  children,
+  className,
+}: {
+  id: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const { setNodeRef } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={className}>
+      {children}
+    </div>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,7 +143,7 @@ function LeftIcon({
       type="button"
       onClick={onClick}
       className={[
-        "flex flex-col h-[27px] w-[44px] justify-center text-center font-['SF_Pro',sans-serif] text-[48px]",
+        "flex h-[27px] w-[44px] items-center justify-center font-['SF_Pro',sans-serif] text-[48px]",
         active ? "text-[#70cd35]" : "text-white",
       ].join(" ")}
     >
@@ -126,7 +166,7 @@ function SortableLeftIcon({
   editMode: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: tab.id, disabled: !editMode });
+    useSortable({ id: railId(tab.id), disabled: !editMode });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -156,15 +196,15 @@ function RightIconColumn({
   onToggle: (id: RightPanelId) => void;
 }) {
   return (
-    <div className="flex flex-col h-full items-start justify-between shrink-0 w-[44px]">
-      <div className="flex flex-col gap-[48px] items-start w-[44px] pt-[10px]">
+    <div className="flex flex-col h-full items-center justify-between shrink-0 w-[44px]">
+      <div className="flex flex-col gap-[48px] items-center w-[44px] pt-[10px]">
         {RIGHT_PANELS.map((p) => (
           <button
             key={p.id}
             type="button"
             onClick={() => onToggle(p.id)}
             className={[
-              "flex flex-col h-[27px] w-full justify-center text-center font-['SF_Pro',sans-serif] text-[48px] leading-[0]",
+              "flex h-[27px] w-full items-center justify-center font-['SF_Pro',sans-serif] text-[48px]",
               openPanel === p.id ? "text-[#70cd35]" : "text-white",
             ].join(" ")}
           >
@@ -173,8 +213,8 @@ function RightIconColumn({
         ))}
       </div>
       {/* K chevron — decorative */}
-      <div className="flex flex-col items-center w-[44px] pb-[10px]">
-        <div className="flex flex-col h-[27px] justify-center font-['SF_Pro',sans-serif] text-[48px] text-center text-white leading-[0] w-full">
+      <div className="flex w-[44px] items-center justify-center pb-[10px]">
+        <div className="flex h-[27px] items-center justify-center font-['SF_Pro',sans-serif] text-[48px] text-white w-full">
           <Sf s="􁍃" className="leading-[normal]" />
         </div>
       </div>
@@ -217,84 +257,48 @@ function RightSideContent({
 
 function DockDrawer({
   availableIcons,
-  installedIds,
-  editMode,
+  activeTabId,
   closing,
-  onToggleEditMode,
-  onClose,
-  onToggleInstall,
+  onOpen,
   onCloseAnimEnd,
 }: {
   availableIcons: { id: string; symbol: string }[];
-  installedIds: Set<string>;
-  editMode: boolean;
+  activeTabId: OverlayTabId | null;
   closing: boolean;
-  onToggleEditMode: () => void;
-  onClose: () => void;
-  onToggleInstall: (id: string) => void;
+  onOpen: (id: string) => void;
   onCloseAnimEnd: () => void;
 }) {
-  const padded = [...availableIcons];
-  while (padded.length < TOTAL_DOCK_SLOTS) {
-    padded.push({ id: `placeholder-${padded.length}`, symbol: PLACEHOLDER_SYMBOL });
-  }
-
   return (
     <div
       className={[
-        "absolute bottom-0 left-1/2 -translate-x-1/2 z-20 will-change-transform",
+        "fixed bottom-0 left-1/2 -translate-x-1/2 z-20 will-change-transform",
         closing ? "animate-ts-dock-down" : "animate-ts-dock-up",
       ].join(" ")}
       onAnimationEnd={closing ? onCloseAnimEnd : undefined}
     >
       <div
         className={[
-          "flex gap-[60px] items-end overflow-clip p-[10px] w-[860px]",
+          "flex overflow-clip p-[10px] w-[860px]",
           "backdrop-blur-[8px] bg-black/50",
           "border-[#70cd35] border-l-4 border-r-4 border-t-4 border-solid",
         ].join(" ")}
       >
-        {/* Icon grid */}
-        <SortableContext items={padded.map((i) => i.id)} strategy={rectSortingStrategy}>
-          <div className="flex flex-1 flex-wrap gap-[12px] items-start min-w-0 font-['SF_Pro',sans-serif] text-[48px] text-center leading-[0] whitespace-nowrap">
-            {padded.map((item) => {
-              const isPlaceholder = item.id.startsWith("placeholder-");
-              const isInstalled = installedIds.has(item.id);
-              return (
-                <SortableDockIcon
-                  key={item.id}
-                  id={item.id}
-                  symbol={item.symbol}
-                  isInstalled={isInstalled}
-                  isPlaceholder={isPlaceholder}
-                  editMode={editMode}
-                  onTap={() => onToggleInstall(item.id)}
-                />
-              );
-            })}
-          </div>
+        <SortableContext items={availableIcons.map((i) => dockId(i.id))} strategy={rectSortingStrategy}>
+          <DroppableZone
+            id="zone-dock"
+            className="flex flex-1 flex-wrap gap-[12px] items-start min-w-0 font-['SF_Pro',sans-serif] text-[48px] text-center leading-[0] whitespace-nowrap"
+          >
+            {availableIcons.map((item) => (
+              <SortableDockIcon
+                key={item.id}
+                id={item.id}
+                symbol={item.symbol}
+                isActive={item.id === activeTabId}
+                onTap={() => onOpen(item.id)}
+              />
+            ))}
+          </DroppableZone>
         </SortableContext>
-
-        {/* Controls column */}
-        <div className="flex flex-col h-full items-center justify-between shrink-0 w-[44px] font-['SF_Pro',sans-serif] text-[48px] text-center leading-[0] whitespace-nowrap">
-          <button
-            type="button"
-            onClick={onToggleEditMode}
-            className={[
-              "flex flex-col justify-center",
-              editMode ? "text-[#70cd35]" : "text-white",
-            ].join(" ")}
-          >
-            <Sf s="􀈋" className="leading-[normal]" />
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex flex-col justify-center text-white"
-          >
-            <Sf s="􀆈" className="leading-[normal]" />
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -303,25 +307,21 @@ function DockDrawer({
 function SortableDockIcon({
   id,
   symbol,
-  isInstalled,
-  isPlaceholder,
-  editMode,
+  isActive,
   onTap,
 }: {
   id: string;
   symbol: string;
-  isInstalled: boolean;
-  isPlaceholder: boolean;
-  editMode: boolean;
+  isActive: boolean;
   onTap: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id, disabled: !editMode || isPlaceholder });
+    useSortable({ id: dockId(id) });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : isPlaceholder ? 0.2 : 1,
+    opacity: isDragging ? 0.3 : 1,
   };
 
   return (
@@ -329,13 +329,12 @@ function SortableDockIcon({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...(editMode && !isPlaceholder ? listeners : {})}
+      {...listeners}
       className={[
-        "flex flex-col justify-center shrink-0",
-        isInstalled && !isPlaceholder ? "text-[#70cd35]" : "text-white",
-        isPlaceholder ? "pointer-events-none" : "cursor-pointer",
+        "flex flex-col justify-center shrink-0 cursor-pointer",
+        isActive ? "text-[#70cd35]" : "text-white",
       ].join(" ")}
-      onClick={isPlaceholder ? undefined : onTap}
+      onClick={onTap}
     >
       <Sf s={symbol} className="leading-[normal]" />
     </div>
@@ -355,7 +354,6 @@ export function TouchscreenDashboard() {
   const [openRightPanel, setOpenRightPanel] = useState<RightPanelId | null>(null);
   const [isDockOpen, setIsDockOpen] = useState(false);
   const [isDockClosing, setIsDockClosing] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
   const [leftRailIcons, setLeftRailIcons] = useState<OverlayTabId[]>(["auto", "settings"]);
   const [dockIcons, setDockIcons] = useState(() =>
     ALL_TABS.map((t) => ({ id: t.id, symbol: t.symbol }))
@@ -366,7 +364,6 @@ export function TouchscreenDashboard() {
   const lastPanelRef = useRef<RightPanelId | null>(null);
   if (openRightPanel) lastPanelRef.current = openRightPanel;
 
-  const installedIds = new Set<string>(leftRailIcons);
   const isDriverBase = activeOverlayTab === null;
   const displayPanelId = openRightPanel ?? lastPanelRef.current;
 
@@ -395,6 +392,7 @@ export function TouchscreenDashboard() {
   // ── tab switching ──
   const switchOverlayTab = useCallback(
     (tabId: OverlayTabId) => {
+      setIsDockClosing(true);
       if (tabId === activeOverlayTab) {
         setPrevOverlayTab(tabId);
         setActiveOverlayTab(null);
@@ -407,6 +405,7 @@ export function TouchscreenDashboard() {
   );
 
   const dismissOverlay = useCallback(() => {
+    setIsDockClosing(true);
     if (activeOverlayTab) {
       setPrevOverlayTab(activeOverlayTab);
       setActiveOverlayTab(null);
@@ -415,13 +414,13 @@ export function TouchscreenDashboard() {
 
   // ── right panel (width transition handles open/close animation) ──
   const togglePanel = useCallback((panelId: RightPanelId) => {
+    setIsDockClosing(true);
     setOpenRightPanel((cur) => (cur === panelId ? null : panelId));
   }, []);
 
   // ── dock ──
   const closeDock = useCallback(() => {
     setIsDockClosing(true);
-    setIsEditMode(false);
   }, []);
 
   const toggleDock = useCallback(() => {
@@ -437,19 +436,12 @@ export function TouchscreenDashboard() {
     setIsDockClosing(false);
   }, []);
 
-  const toggleInstall = useCallback(
+  const openFromDock = useCallback(
     (id: string) => {
-      if (!isEditMode) {
-        const tab = ALL_TABS.find((t) => t.id === id);
-        if (tab) switchOverlayTab(tab.id);
-        return;
-      }
-      const tabId = id as OverlayTabId;
-      setLeftRailIcons((prev) =>
-        prev.includes(tabId) ? prev.filter((i) => i !== tabId) : [...prev, tabId],
-      );
+      const tab = ALL_TABS.find((t) => t.id === id);
+      if (tab) switchOverlayTab(tab.id);
     },
-    [isEditMode, switchOverlayTab],
+    [switchOverlayTab],
   );
 
   // ── dnd ──
@@ -461,56 +453,90 @@ export function TouchscreenDashboard() {
   const draggingTabDef = draggingId ? ALL_TABS.find((t) => t.id === draggingId) ?? null : null;
 
   function handleDragStart(e: DragStartEvent) {
-    setDraggingId(String(e.active.id));
+    // Strip prefix so DragOverlay can look up the tab definition by raw ID
+    const parsed = parseId(String(e.active.id));
+    setDraggingId(parsed ? parsed.tabId : String(e.active.id));
   }
 
   function handleDragEnd(e: DragEndEvent) {
     setDraggingId(null);
     const { active, over } = e;
-    if (!over || active.id === over.id) return;
+    if (!over) return;
 
-    const aId = String(active.id);
-    const oId = String(over.id);
-    const aInRail = leftRailIcons.includes(aId as OverlayTabId);
-    const oInRail = leftRailIcons.includes(oId as OverlayTabId);
-    const aInDock = dockIcons.some((d) => d.id === aId);
-    const oInDock = dockIcons.some((d) => d.id === oId);
+    const a = parseId(String(active.id));
+    const o = parseId(String(over.id));
+    const overZone = String(over.id); // For droppable zone fallback
 
-    if (aInRail && oInRail) {
-      const oi = leftRailIcons.indexOf(aId as OverlayTabId);
-      const ni = leftRailIcons.indexOf(oId as OverlayTabId);
-      if (oi !== -1 && ni !== -1) setLeftRailIcons((p) => arrayMove(p, oi, ni));
-    } else if (aInDock && oInDock) {
-      const oi = dockIcons.findIndex((d) => d.id === aId);
-      const ni = dockIcons.findIndex((d) => d.id === oId);
-      if (oi !== -1 && ni !== -1) setDockIcons((p) => arrayMove(p, oi, ni));
-    } else if (aInDock && oInRail && !leftRailIcons.includes(aId as OverlayTabId)) {
-      const idx = leftRailIcons.indexOf(oId as OverlayTabId);
-      setLeftRailIcons((p) => {
-        const n = [...p];
-        if (idx !== -1) n.splice(idx, 0, aId as OverlayTabId);
-        else n.push(aId as OverlayTabId);
-        return n;
-      });
-    } else if (aInRail && oInDock) {
-      setLeftRailIcons((p) => p.filter((i) => i !== (aId as OverlayTabId)));
+    if (!a) return;
+
+    // ── Rail-to-Rail reorder ──
+    if (a.zone === "rail" && o?.zone === "rail") {
+      const fromIdx = leftRailIcons.indexOf(a.tabId as OverlayTabId);
+      const toIdx = leftRailIcons.indexOf(o.tabId as OverlayTabId);
+      if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+        setLeftRailIcons((prev) => arrayMove(prev, fromIdx, toIdx));
+      }
+      return;
+    }
+
+    // ── Dock-to-Dock reorder ──
+    if (a.zone === "dock" && o?.zone === "dock") {
+      const fromIdx = dockIcons.findIndex((d) => d.id === a.tabId);
+      const toIdx = dockIcons.findIndex((d) => d.id === o.tabId);
+      if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+        setDockIcons((prev) => arrayMove(prev, fromIdx, toIdx));
+      }
+      return;
+    }
+
+    // ── Dock-to-Rail (pin to sidebar) ──
+    if (a.zone === "dock" && (o?.zone === "rail" || overZone === "zone-rail")) {
+      const tabId = a.tabId as OverlayTabId;
+      if (!leftRailIcons.includes(tabId)) {
+        if (o?.zone === "rail") {
+          // Insert near the drop target
+          const targetIdx = leftRailIcons.indexOf(o.tabId as OverlayTabId);
+          setLeftRailIcons((prev) => {
+            const next = [...prev];
+            next.splice(targetIdx + 1, 0, tabId);
+            return next;
+          });
+        } else {
+          // Dropped on the zone background — append to end
+          setLeftRailIcons((prev) => [...prev, tabId]);
+        }
+      }
+      return;
+    }
+
+    // ── Rail-to-Dock (unpin from sidebar) ──
+    if (a.zone === "rail" && (o?.zone === "dock" || overZone === "zone-dock")) {
+      const tabId = a.tabId as OverlayTabId;
+      setLeftRailIcons((prev) => prev.filter((id) => id !== tabId));
+      return;
     }
   }
 
-  // ── shared inline style for right-side width transition ──
-  const rightSideTransitionStyle = {
+  // ── right panel style: width + green inset border, both transition smoothly ──
+  const rightPanelStyle = {
     width: rightSideWidth,
-    transition: `width ${PANEL_DURATION} ${EASE}`,
-    willChange: "width" as const,
-  };
-
-  // Overlay mode also transitions the green border via box-shadow (no layout shift)
-  const overlayRightStyle = {
-    ...rightSideTransitionStyle,
     boxShadow: openRightPanel
       ? "inset 4px 0 0 0 #70cd35"
       : "inset 4px 0 0 0 transparent",
     transition: `width ${PANEL_DURATION} ${EASE}, box-shadow ${PANEL_DURATION} ${EASE}`,
+    willChange: "width" as const,
+  };
+
+  // Driver layer: right panel floats OVER it (original overlay behaviour),
+  // so it always extends to the right edge — no right inset needed.
+  const driverLayerStyle = { left: 84, right: 0 };
+
+  // Non-driver app tabs: right panel takes dedicated space, so these layers
+  // stop at the panel edge and resize with it.
+  const appLayerStyle = {
+    left: 84,
+    right: rightSideWidth,
+    transition: `right ${PANEL_DURATION} ${EASE}`,
   };
 
   return (
@@ -520,20 +546,52 @@ export function TouchscreenDashboard() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="fixed inset-0 flex overflow-hidden bg-black text-white">
-        {/* ── LEFT RAIL ── no background per Figma (transparent over black) */}
-        <aside className="flex w-[84px] shrink-0 flex-col items-start justify-between overflow-clip px-[20px] py-[30px]">
-          {/* Top icon group */}
-          <div className="flex flex-col gap-[48px] items-start w-[44px]">
-            {/* Pinned: driver */}
-            <LeftIcon
-              symbol="􁿢"
-              activeSymbol="􁿣"
-              active={isDriverBase && !isDockOpen}
-              onClick={dismissOverlay}
-            />
-            {/* Custom tab icons */}
-            <SortableContext items={leftRailIcons} strategy={verticalListSortingStrategy}>
+      {/* ── APP LAYERS — positioned between the chrome, never overlap sidebars ── */}
+
+      {/* Driver content (always at base) */}
+      <div className="fixed top-0 bottom-0 z-0 bg-black" style={driverLayerStyle}>
+        <PlaceholderScreen title="Driver tab" />
+      </div>
+
+      {/* Exiting overlay tab (slides down) */}
+      {prevOverlayTab !== null && (
+        <div
+          key={`exit-${prevOverlayTab}`}
+          className="fixed top-0 bottom-0 z-10 bg-black animate-ts-slide-down will-change-transform"
+          style={appLayerStyle}
+          onAnimationEnd={() => setPrevOverlayTab(null)}
+        >
+          {renderTabContent(prevOverlayTab)}
+        </div>
+      )}
+
+      {/* Active overlay tab (slides up) */}
+      {activeOverlayTab !== null && (
+        <div
+          key={`enter-${activeOverlayTab}`}
+          className="fixed top-0 bottom-0 z-10 bg-black animate-ts-slide-up will-change-transform"
+          style={appLayerStyle}
+        >
+          {renderTabContent(activeOverlayTab)}
+        </div>
+      )}
+
+      {/* ── CHROME — fixed position, never reflows, always z-20 ── */}
+
+      {/* Left rail */}
+      <aside className="fixed left-0 top-0 bottom-0 z-20 flex w-[84px] flex-col items-center justify-between overflow-clip py-[30px]">
+        {/* Top icon group */}
+        <div className="flex flex-col gap-[48px] items-center w-[44px]">
+          {/* Pinned: driver */}
+          <LeftIcon
+            symbol="􁿢"
+            activeSymbol="􁿣"
+            active={isDriverBase}
+            onClick={dismissOverlay}
+          />
+          {/* Custom tab icons */}
+          <SortableContext items={leftRailIcons.map(railId)} strategy={verticalListSortingStrategy}>
+            <DroppableZone id="zone-rail" className="flex flex-col gap-[48px]">
               {leftRailIcons.map((tabId) => {
                 const def = ALL_TABS.find((t) => t.id === tabId)!;
                 return (
@@ -542,103 +600,62 @@ export function TouchscreenDashboard() {
                     tab={def}
                     active={activeOverlayTab === tabId}
                     onClick={() => switchOverlayTab(tabId)}
-                    editMode={isEditMode && isDockOpen}
+                    editMode={isDockOpen}
                   />
                 );
               })}
-            </SortableContext>
-          </div>
-
-          {/* Pinned bottom: dock */}
-          <div className="flex flex-col items-center w-[44px]">
-            <LeftIcon
-              symbol="􀏞"
-              activeSymbol="􀏞"
-              active={isDockOpen}
-              onClick={toggleDock}
-            />
-          </div>
-        </aside>
-
-        {/* ── MAIN AREA ── */}
-        <div className="relative min-w-0 flex-1 overflow-hidden">
-          {/* Driver content (always at base) */}
-          <div className="absolute inset-0 z-0">
-            <PlaceholderScreen title="Driver tab" />
-          </div>
-
-          {/* Exiting overlay tab (slides down) */}
-          {prevOverlayTab !== null && (
-            <div
-              key={`exit-${prevOverlayTab}`}
-              className="absolute inset-0 z-10 bg-black animate-ts-slide-down will-change-transform"
-              onAnimationEnd={() => setPrevOverlayTab(null)}
-            >
-              {renderTabContent(prevOverlayTab)}
-            </div>
-          )}
-
-          {/* Active overlay tab (slides up) */}
-          {activeOverlayTab !== null && (
-            <div
-              key={`enter-${activeOverlayTab}`}
-              className="absolute inset-0 z-10 bg-black animate-ts-slide-up will-change-transform"
-            >
-              {renderTabContent(activeOverlayTab)}
-            </div>
-          )}
-
-          {/* ── Right side OVERLAY (driver mode only) ──
-               Width transitions 84px ↔ 540px, revealing/hiding the panel content.
-               The green border is rendered via box-shadow to avoid layout shifts. */}
-          {isDriverBase && (
-            <div
-              className="absolute top-0 right-0 z-[15] h-full overflow-hidden backdrop-blur-[4px] bg-black/50"
-              style={overlayRightStyle}
-            >
-              <RightSideContent
-                openPanel={openRightPanel}
-                displayPanel={displayPanelId}
-                onToggle={togglePanel}
-              />
-            </div>
-          )}
-
-          {/* Dock drawer */}
-          {isDockOpen && (
-            <DockDrawer
-              availableIcons={dockIcons}
-              installedIds={installedIds}
-              editMode={isEditMode}
-              closing={isDockClosing}
-              onToggleEditMode={() => setIsEditMode((m) => !m)}
-              onClose={closeDock}
-              onToggleInstall={toggleInstall}
-              onCloseAnimEnd={onDockCloseAnimEnd}
-            />
-          )}
+            </DroppableZone>
+          </SortableContext>
         </div>
 
-        {/* ── Right side INLINE (non-driver mode) ──
-             Same width-reveal transition, but as a flex sibling so main area resizes. */}
-        {!isDriverBase && (
-          <div
-            className="h-full shrink-0 overflow-hidden backdrop-blur-[4px] bg-black/50"
-            style={rightSideTransitionStyle}
-          >
-            <RightSideContent
-              openPanel={openRightPanel}
-              displayPanel={displayPanelId}
-              onToggle={togglePanel}
-            />
-          </div>
-        )}
+        {/* Pinned bottom: dock */}
+        <div className="flex flex-col items-center w-[44px]">
+          <LeftIcon
+            symbol="􀏞"
+            activeSymbol="􀏞"
+            active={isDockOpen}
+            onClick={toggleDock}
+          />
+        </div>
+      </aside>
+
+      {/* Right panel — always fixed, width transitions 84px ↔ 540px.
+           Driver tab: frosted glass (panel floats over content).
+           Other tabs: opaque (panel is a solid sidebar beside content). */}
+      <div
+        className={[
+          "fixed top-0 right-0 bottom-0 z-20 overflow-hidden",
+          isDriverBase ? "backdrop-blur-[4px] bg-black/50" : "bg-black",
+        ].join(" ")}
+        style={rightPanelStyle}
+      >
+        <RightSideContent
+          openPanel={openRightPanel}
+          displayPanel={displayPanelId}
+          onToggle={togglePanel}
+        />
       </div>
+
+      {/* Dock backdrop — closes dock when tapping outside it */}
+      {isDockOpen && !isDockClosing && (
+        <div className="fixed inset-0 z-[19]" onClick={closeDock} />
+      )}
+
+      {/* Dock drawer */}
+      {isDockOpen && (
+        <DockDrawer
+          availableIcons={dockIcons}
+          activeTabId={activeOverlayTab}
+          closing={isDockClosing}
+          onOpen={openFromDock}
+          onCloseAnimEnd={onDockCloseAnimEnd}
+        />
+      )}
 
       {/* DnD ghost */}
       <DragOverlay>
         {draggingTabDef ? (
-          <div className="flex flex-col justify-center font-['SF_Pro',sans-serif] text-[48px] text-white text-center leading-[0] opacity-80">
+          <div className="flex items-center justify-center font-['SF_Pro',sans-serif] text-[48px] text-white opacity-80">
             <Sf s={draggingTabDef.symbol} className="leading-[normal]" />
           </div>
         ) : null}
