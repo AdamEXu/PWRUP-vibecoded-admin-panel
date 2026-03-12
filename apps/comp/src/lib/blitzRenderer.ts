@@ -66,6 +66,10 @@ export interface BlitzRendererBridge {
     unsubscribeTopic: (subscriptionId: number) => Promise<void>;
     publish: (params: { topic: string; payload: Uint8Array | ArrayBuffer }) => Promise<void>;
   };
+  debug: {
+    subscribeLaneToastPreview: (callback: (enabled: boolean) => void) => number;
+    unsubscribeLaneToastPreview: (callbackId: number) => void;
+  };
 }
 
 declare global {
@@ -126,5 +130,15 @@ export function subscribeAutobahnStatus(callback: (isConnected: boolean) => void
   const callbackId = bridge.autobahn.subscribeStatus(callback);
   return () => {
     bridge.autobahn.unsubscribeStatus(callbackId);
+  };
+}
+
+export function subscribeLaneToastPreview(
+  callback: (enabled: boolean) => void,
+): () => void {
+  const bridge = requireBridge();
+  const callbackId = bridge.debug.subscribeLaneToastPreview(callback);
+  return () => {
+    bridge.debug.unsubscribeLaneToastPreview(callbackId);
   };
 }

@@ -212,11 +212,7 @@ function RightIconColumn({
           </button>
         ))}
       </div>
-      {/* K chevron — decorative */}
       <div className="flex w-[44px] items-center justify-center pb-[10px]">
-        <div className="flex h-[27px] items-center justify-center font-['SF_Pro',sans-serif] text-[48px] text-white w-full">
-          <Sf s="􁍃" className="leading-[normal]" />
-        </div>
       </div>
     </div>
   );

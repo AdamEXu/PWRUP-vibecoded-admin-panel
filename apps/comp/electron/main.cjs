@@ -12,6 +12,7 @@ const DEFAULT_DEV_URL = "http://127.0.0.1:3001";
 const SERVER_START_TIMEOUT_MS = 60_000;
 const SERVER_POLL_INTERVAL_MS = 300;
 const TILE_SHORTCUT_KEY = "f";
+const PREVIEW_TOAST_SHORTCUT_KEY = "n";
 const MAIN_HUD_DISPLAY_SIZE = { width: 1920, height: 1080 };
 const TOUCHSCREEN_DISPLAY_SIZE = { width: 1920, height: 515 };
 
@@ -276,6 +277,22 @@ function isShortcutInput(input) {
   );
 }
 
+function isPreviewToastShortcutInput(input) {
+  const key = String(input.key || "").toLowerCase();
+  const code = String(input.code || "");
+  return (
+    input.type === "keyDown" &&
+    input.alt &&
+    !input.control &&
+    !input.meta &&
+    (code === "KeyN" || key === PREVIEW_TOAST_SHORTCUT_KEY || key === "dead")
+  );
+}
+
+function getPreviewToastEnabledFromShortcut(input) {
+  return !input.shift;
+}
+
 function findDisplayByExactBounds(targetSize) {
   return screen
     .getAllDisplays()
@@ -324,6 +341,15 @@ function tileCompWindows() {
 
 function attachTilingShortcut(window) {
   window.webContents.on("before-input-event", (event, input) => {
+    if (isPreviewToastShortcutInput(input)) {
+      event.preventDefault();
+      window.webContents.send(
+        "blitz:debug:lane-toast-preview",
+        getPreviewToastEnabledFromShortcut(input),
+      );
+      return;
+    }
+
     if (!isShortcutInput(input)) {
       return;
     }
