@@ -22,6 +22,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TouchscreenSettingsPanel } from "./TouchscreenSettingsPanel";
+import { AutoSelector } from "./AutoSelector";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,102 @@ const RIGHT_PANELS: RightPanelDef[] = [
   { id: "showStatus", label: "Status", symbol: "􀅴", activeSymbol: "􀅵" },
   { id: "showCamera", label: "Camera", symbol: "􀌞", activeSymbol: "􀌟" },
 ];
+
+const TOUCHSCREEN_LAYOUT_STORAGE_KEY = "pwrup.touchscreen.layout.v1";
+const DEFAULT_LEFT_RAIL_ICONS: OverlayTabId[] = ["auto", "settings"];
+const DEFAULT_DOCK_ORDER: OverlayTabId[] = ALL_TABS.map((tab) => tab.id);
+
+function isOverlayTabId(value: unknown): value is OverlayTabId {
+  return (
+    typeof value === "string" &&
+    DEFAULT_DOCK_ORDER.some((tabId) => tabId === value)
+  );
+}
+
+function sanitizeTabList(value: unknown): OverlayTabId[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const unique = new Set<OverlayTabId>();
+  for (const item of value) {
+    if (isOverlayTabId(item)) {
+      unique.add(item);
+    }
+  }
+  return [...unique];
+}
+
+function normalizeDockOrder(value: unknown): OverlayTabId[] {
+  const sanitized = sanitizeTabList(value);
+  const remaining = DEFAULT_DOCK_ORDER.filter((tabId) => !sanitized.includes(tabId));
+  return [...sanitized, ...remaining];
+}
+
+function loadLayoutState(): {
+  leftRailIcons: OverlayTabId[];
+  dockOrder: OverlayTabId[];
+} {
+  const fallback = {
+    leftRailIcons: DEFAULT_LEFT_RAIL_ICONS,
+    dockOrder: DEFAULT_DOCK_ORDER,
+  };
+
+  if (typeof window === "undefined" || typeof window.localStorage?.getItem !== "function") {
+    return fallback;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(TOUCHSCREEN_LAYOUT_STORAGE_KEY);
+    if (!raw) {
+      return fallback;
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") {
+      return fallback;
+    }
+
+    const source = parsed as {
+      leftRailIcons?: unknown;
+      dockOrder?: unknown;
+    };
+
+    return {
+      leftRailIcons: Array.isArray(source.leftRailIcons)
+        ? sanitizeTabList(source.leftRailIcons)
+        : DEFAULT_LEFT_RAIL_ICONS,
+      dockOrder: normalizeDockOrder(source.dockOrder),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function saveLayoutState(leftRailIcons: OverlayTabId[], dockOrder: OverlayTabId[]): void {
+  if (typeof window === "undefined" || typeof window.localStorage?.setItem !== "function") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      TOUCHSCREEN_LAYOUT_STORAGE_KEY,
+      JSON.stringify({
+        leftRailIcons,
+        dockOrder,
+      }),
+    );
+  } catch {
+    // Ignore storage write failures and keep in-memory state.
+  }
+}
+
+function dockIconsFromOrder(order: OverlayTabId[]): { id: OverlayTabId; symbol: string }[] {
+  return order.map((tabId) => {
+    const tab = ALL_TABS.find((entry) => entry.id === tabId)!;
+    return { id: tab.id, symbol: tab.symbol };
+  });
+}
 
 // ─── DnD ID helpers ──────────────────────────────────────────────────────────
 
@@ -121,7 +218,7 @@ function PlaceholderScreen({ title }: { title: string }) {
 
 function renderTabContent(tabId: OverlayTabId) {
   if (tabId === "settings") return <TouchscreenSettingsPanel />;
-  if (tabId === "auto") return <PlaceholderScreen title="Auto Select" />;
+  if (tabId === "auto") return <AutoSelector />;
   return <PlaceholderScreen title="Special effects tab" />;
 }
 
@@ -341,19 +438,19 @@ function SortableDockIcon({
 
 const EASE = "cubic-bezier(0.25, 0.1, 0.25, 1)";
 const PANEL_DURATION = "300ms";
+const TOUCHSCREEN_DND_CONTEXT_ID = "touchscreen-dashboard-dnd";
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function TouchscreenDashboard() {
+  const [initialLayout] = useState(loadLayoutState);
   const [activeOverlayTab, setActiveOverlayTab] = useState<OverlayTabId | null>(null);
   const [prevOverlayTab, setPrevOverlayTab] = useState<OverlayTabId | null>(null);
   const [openRightPanel, setOpenRightPanel] = useState<RightPanelId | null>(null);
   const [isDockOpen, setIsDockOpen] = useState(false);
   const [isDockClosing, setIsDockClosing] = useState(false);
-  const [leftRailIcons, setLeftRailIcons] = useState<OverlayTabId[]>(["auto", "settings"]);
-  const [dockIcons, setDockIcons] = useState(() =>
-    ALL_TABS.map((t) => ({ id: t.id, symbol: t.symbol }))
-  );
+  const [leftRailIcons, setLeftRailIcons] = useState<OverlayTabId[]>(initialLayout.leftRailIcons);
+  const [dockIcons, setDockIcons] = useState(() => dockIconsFromOrder(initialLayout.dockOrder));
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   // Track last-opened panel so content stays rendered during close width transition
@@ -361,6 +458,8 @@ export function TouchscreenDashboard() {
   if (openRightPanel) lastPanelRef.current = openRightPanel;
 
   const isDriverBase = activeOverlayTab === null;
+  // Tabs that want the right panel to overlay (frosted glass) instead of pushing content
+  const useOverlayRightPanel = isDriverBase;
   const displayPanelId = openRightPanel ?? lastPanelRef.current;
 
   // Width for right-side container: 84px (rail) or 540px (full panel)
@@ -384,6 +483,13 @@ export function TouchscreenDashboard() {
       return () => clearTimeout(t);
     }
   }, [isDockClosing]);
+
+  useEffect(() => {
+    saveLayoutState(
+      leftRailIcons,
+      dockIcons.map((icon) => icon.id),
+    );
+  }, [leftRailIcons, dockIcons]);
 
   // ── tab switching ──
   const switchOverlayTab = useCallback(
@@ -537,6 +643,7 @@ export function TouchscreenDashboard() {
 
   return (
     <DndContext
+      id={TOUCHSCREEN_DND_CONTEXT_ID}
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
@@ -621,7 +728,7 @@ export function TouchscreenDashboard() {
       <div
         className={[
           "fixed top-0 right-0 bottom-0 z-20 overflow-hidden",
-          isDriverBase ? "backdrop-blur-[4px] bg-black/50" : "bg-black",
+          useOverlayRightPanel ? "backdrop-blur-[4px] bg-black/50" : "bg-black",
         ].join(" ")}
         style={rightPanelStyle}
       >
