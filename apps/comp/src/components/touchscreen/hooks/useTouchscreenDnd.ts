@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import {
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -25,8 +25,8 @@ export function useTouchscreenDnd({
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 25 } }),
   );
 
   const draggingTabDef = draggingId ? ALL_TABS.find((tab) => tab.id === draggingId) ?? null : null;

@@ -22,6 +22,7 @@ export function SortableLeftIcon({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.3 : 1,
+    touchAction: editMode ? ("none" as const) : undefined,
   };
 
   return (
