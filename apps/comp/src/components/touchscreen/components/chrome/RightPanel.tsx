@@ -22,6 +22,7 @@ export function RightPanel({
     dimension: 456, // content width (540 - 84), so icon column stays at screen edge
     onCommit: onSwipeClose,
     enabled: openPanel !== null,
+    resetOnCommit: true,
   });
 
   return (

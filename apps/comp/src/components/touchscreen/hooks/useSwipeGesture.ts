@@ -14,6 +14,8 @@ interface UseSwipeGestureOptions {
   commitRatio?: number;
   /** Minimum velocity (px/ms) for a fast-flick commit. Default 0.5 */
   velocityThreshold?: number;
+  /** If true, reset transform after commit (for elements that stay in DOM). Default false. */
+  resetOnCommit?: boolean;
 }
 
 interface TouchSample {
@@ -47,6 +49,7 @@ export function useSwipeGesture({
   enabled = true,
   commitRatio = 0.35,
   velocityThreshold = 0.5,
+  resetOnCommit = false,
 }: UseSwipeGestureOptions) {
   const ref = useRef<HTMLDivElement>(null);
   const isSwipingRef = useRef(false);
@@ -71,6 +74,8 @@ export function useSwipeGesture({
   commitRatioRef.current = commitRatio;
   const velocityThresholdRef = useRef(velocityThreshold);
   velocityThresholdRef.current = velocityThreshold;
+  const resetOnCommitRef = useRef(resetOnCommit);
+  resetOnCommitRef.current = resetOnCommit;
 
   const applyTransform = useCallback(
     (px: number) => {
@@ -248,11 +253,15 @@ export function useSwipeGesture({
 
       if (pastThreshold || fastFlick) {
         committed = true;
-        // Animate off-screen then commit — do NOT reset transform,
-        // React will unmount the element so resetting would cause a flicker
         animateTo(dim, () => {
           isSwipingRef.current = false;
           commitCallbackRef.current();
+          // Elements that stay in DOM (e.g. right panel) need their transform reset
+          // after the state update. Elements that unmount (overlay tabs) must NOT
+          // reset or they'll flicker back to position 0 for one frame.
+          if (resetOnCommitRef.current) {
+            requestAnimationFrame(() => resetElement());
+          }
         });
       } else {
         // Snap back
