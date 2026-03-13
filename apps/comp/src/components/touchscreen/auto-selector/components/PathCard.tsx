@@ -1,10 +1,10 @@
 export function PathCard({
-  name,
+  displayName,
   isActive,
   isViewing,
   onTap,
 }: {
-  name: string;
+  displayName: string;
   isActive: boolean;
   isViewing: boolean;
   onTap: () => void;
@@ -22,7 +22,7 @@ export function PathCard({
         .filter(Boolean)
         .join(" ")}
     >
-      <p className="w-full truncate text-xl font-semibold text-white">{name}</p>
+      <p className="w-full truncate text-xl font-semibold text-white">{displayName}</p>
       <p
         className={[
           "w-full text-sm font-bold",

@@ -43,3 +43,5 @@ next-env.d.ts
 dist-electron/
 
 .next/
+
+dist-electron-comp/

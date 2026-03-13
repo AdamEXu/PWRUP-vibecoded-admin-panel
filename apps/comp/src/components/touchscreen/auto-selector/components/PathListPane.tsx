@@ -1,9 +1,10 @@
-import type { AutoPathEntry } from "../types";
+import type { AutoPathEntry, AutoPathMetadata } from "../types";
 import { PathCard } from "./PathCard";
 import { ScrollTrack } from "./ScrollTrack";
 
 export function PathListPane({
   paths,
+  metadataByPathName,
   isLoading,
   error,
   reload,
@@ -13,6 +14,7 @@ export function PathListPane({
   scrollRef,
 }: {
   paths: AutoPathEntry[];
+  metadataByPathName: Record<string, AutoPathMetadata>;
   isLoading: boolean;
   error: string | null;
   reload: () => Promise<void>;
@@ -33,7 +35,7 @@ export function PathListPane({
         {paths.map((entry) => (
           <PathCard
             key={entry.fileName}
-            name={entry.name}
+            displayName={metadataByPathName[entry.name]?.name ?? entry.name}
             isActive={activePathName === entry.name}
             isViewing={viewingPathName === entry.name}
             onTap={() => onViewPath(entry.name)}
