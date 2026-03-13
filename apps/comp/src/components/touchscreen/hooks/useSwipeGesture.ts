@@ -259,8 +259,14 @@ export function useSwipeGesture({
           // Elements that stay in DOM (e.g. right panel) need their transform reset
           // after the state update. Elements that unmount (overlay tabs) must NOT
           // reset or they'll flicker back to position 0 for one frame.
+          // Double rAF ensures React has painted the new state (e.g. collapsed width)
+          // before we clear the transform.
           if (resetOnCommitRef.current) {
-            requestAnimationFrame(() => resetElement());
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                resetElement();
+              });
+            });
           }
         });
       } else {
