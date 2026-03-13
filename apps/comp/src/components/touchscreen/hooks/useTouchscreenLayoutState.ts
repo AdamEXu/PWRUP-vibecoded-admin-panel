@@ -87,7 +87,9 @@ export function useTouchscreenLayoutState() {
   }, []);
 
   /** Close panel without width transition — caller already animated the slide-out. */
+  const skipPanelTransitionRef = useRef(false);
   const closePanelImmediate = useCallback(() => {
+    skipPanelTransitionRef.current = true;
     setIsDockClosing(true);
     setOpenRightPanel(null);
   }, []);
@@ -123,12 +125,17 @@ export function useTouchscreenLayoutState() {
     setPrevOverlayTab(null);
   }, []);
 
+  const skipTransition = skipPanelTransitionRef.current;
+  if (skipTransition) skipPanelTransitionRef.current = false;
+
   const rightPanelStyle: React.CSSProperties = {
     width: rightSideWidth,
     boxShadow: openRightPanel
       ? "inset 4px 0 0 0 #70cd35"
       : "inset 4px 0 0 0 transparent",
-    transition: `width ${PANEL_DURATION} ${EASE}, box-shadow ${PANEL_DURATION} ${EASE}`,
+    transition: skipTransition
+      ? "none"
+      : `width ${PANEL_DURATION} ${EASE}, box-shadow ${PANEL_DURATION} ${EASE}`,
     willChange: "width",
   };
 
@@ -137,7 +144,7 @@ export function useTouchscreenLayoutState() {
   const appLayerStyle: React.CSSProperties = {
     left: 84,
     right: rightSideWidth,
-    transition: `right ${PANEL_DURATION} ${EASE}`,
+    transition: skipTransition ? "none" : `right ${PANEL_DURATION} ${EASE}`,
   };
 
   return {
