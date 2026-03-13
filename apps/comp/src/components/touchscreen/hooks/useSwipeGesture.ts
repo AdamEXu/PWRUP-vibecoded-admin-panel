@@ -100,16 +100,16 @@ export function useSwipeGesture({
       if (!el) return;
       el.style.transition = "transform 200ms cubic-bezier(0.25, 0.1, 0.25, 1)";
       applyTransform(px);
-      const handler = () => {
-        el.removeEventListener("transitionend", handler);
+      let fired = false;
+      const done = () => {
+        if (fired) return;
+        fired = true;
+        el.removeEventListener("transitionend", done);
         then?.();
       };
-      el.addEventListener("transitionend", handler);
+      el.addEventListener("transitionend", done);
       // Safety timeout in case transitionend doesn't fire
-      setTimeout(() => {
-        el.removeEventListener("transitionend", handler);
-        then?.();
-      }, 250);
+      setTimeout(done, 250);
     },
     [applyTransform],
   );
@@ -197,8 +197,8 @@ export function useSwipeGesture({
       // Prevent scrolling — we own this touch
       e.preventDefault();
 
-      // Clamp to >= 0 (can only swipe in the dismiss direction)
-      delta.current = Math.max(0, mainDelta);
+      // Clamp to [0, dimension] (can only swipe in the dismiss direction, can't overshoot)
+      delta.current = Math.min(dimensionRef.current, Math.max(0, mainDelta));
 
       // Record sample for velocity
       const now = performance.now();
@@ -248,13 +248,11 @@ export function useSwipeGesture({
 
       if (pastThreshold || fastFlick) {
         committed = true;
-        // Animate off-screen then commit
+        // Animate off-screen then commit — do NOT reset transform,
+        // React will unmount the element so resetting would cause a flicker
         animateTo(dim, () => {
+          isSwipingRef.current = false;
           commitCallbackRef.current();
-          // Small delay to let React state update before resetting transform
-          requestAnimationFrame(() => {
-            resetElement();
-          });
         });
       } else {
         // Snap back
