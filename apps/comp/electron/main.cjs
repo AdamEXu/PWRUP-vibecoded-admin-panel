@@ -456,9 +456,7 @@ app
   .then(async () => {
     await initializeBridge();
     await createWindows();
-    if (app.isPackaged) {
-      tileCompWindows();
-    }
+    tileCompWindows();
   })
   .catch((error) => {
     const baseMessage = `Failed to start the app.\n\n${error.message}`;
