@@ -119,5 +119,7 @@ contextBridge.exposeInMainWorld("blitzRenderer", {
     unsubscribeLaneToastPreview: (callbackId) => {
       debugLaneToastPreviewCallbacks.delete(callbackId);
     },
+    getMainWindowMock: () => ipcRenderer.invoke("blitz:debug:get-main-window-mock"),
+    setMainWindowMock: (scenario) => ipcRenderer.invoke("blitz:debug:set-main-window-mock", scenario),
   },
 });

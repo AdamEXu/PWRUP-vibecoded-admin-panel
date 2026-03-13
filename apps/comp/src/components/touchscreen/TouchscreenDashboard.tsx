@@ -1,23 +1,30 @@
 "use client";
 
 import { DndContext, DragOverlay, closestCenter } from "@dnd-kit/core";
+import { useCallback, useState } from "react";
+import { ConnectionLost } from "../match/ConnectionLost";
 import { LeftRail } from "./components/chrome/LeftRail";
 import { RightPanel } from "./components/chrome/RightPanel";
 import { PlaceholderScreen } from "./components/common/PlaceholderScreen";
 import { TouchscreenDragGhost } from "./components/dnd/TouchscreenDragGhost";
 import { DockDrawer } from "./components/dock/DockDrawer";
 import { useTouchscreenDnd } from "./hooks/useTouchscreenDnd";
+import { useSwipeGesture } from "./hooks/useSwipeGesture";
 import { useTouchscreenLayoutState } from "./hooks/useTouchscreenLayoutState";
+import { usePathNetworkTable } from "@/lib/hooks/usePathNetworkTable";
 import { TOUCHSCREEN_DND_CONTEXT_ID } from "./model";
 import { TouchscreenTabContent } from "./tabs/TouchscreenTabContent";
 
 export function TouchscreenDashboard() {
+  const { isConnected } = usePathNetworkTable();
   const {
     activeOverlayTab,
     appLayerStyle,
     clearPrevOverlayTab,
     closeDock,
+    closePanelImmediate,
     dismissOverlay,
+    dismissOverlayImmediate,
     displayPanelId,
     dockIcons,
     driverLayerStyle,
@@ -37,6 +44,23 @@ export function TouchscreenDashboard() {
     togglePanel,
     useOverlayRightPanel,
   } = useTouchscreenLayoutState();
+
+  // Track whether the entry animation has finished so we can hand off to gesture transform
+  const [entryAnimDone, setEntryAnimDone] = useState(false);
+  const onEntryAnimEnd = useCallback(() => setEntryAnimDone(true), []);
+  // Reset when active tab changes
+  const [lastTab, setLastTab] = useState(activeOverlayTab);
+  if (activeOverlayTab !== lastTab) {
+    setLastTab(activeOverlayTab);
+    if (activeOverlayTab !== null) setEntryAnimDone(false);
+  }
+
+  const { ref: swipeDownRef } = useSwipeGesture({
+    direction: "down",
+    dimension: typeof window !== "undefined" ? window.innerHeight : 800,
+    onCommit: dismissOverlayImmediate,
+    enabled: activeOverlayTab !== null && entryAnimDone,
+  });
 
   const { draggingTabDef, handleDragEnd, handleDragStart, sensors } = useTouchscreenDnd({
     leftRailIcons,
@@ -70,9 +94,20 @@ export function TouchscreenDashboard() {
 
       {activeOverlayTab !== null && (
         <div
+          ref={swipeDownRef}
           key={`enter-${activeOverlayTab}`}
-          className="fixed top-0 bottom-0 z-10 bg-black animate-ts-slide-up will-change-transform"
-          style={appLayerStyle}
+          className={[
+            "fixed top-0 bottom-0 z-10 bg-black will-change-transform",
+            !entryAnimDone && "animate-ts-slide-up",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          style={
+            entryAnimDone
+              ? { ...appLayerStyle, transform: "translate3d(0, 0, 0)" }
+              : appLayerStyle
+          }
+          onAnimationEnd={onEntryAnimEnd}
         >
           <TouchscreenTabContent tabId={activeOverlayTab} />
         </div>
@@ -93,6 +128,7 @@ export function TouchscreenDashboard() {
         openPanel={openRightPanel}
         displayPanel={displayPanelId}
         onToggle={togglePanel}
+        onSwipeClose={closePanelImmediate}
         style={rightPanelStyle}
       />
 
@@ -113,6 +149,8 @@ export function TouchscreenDashboard() {
       <DragOverlay>
         <TouchscreenDragGhost symbol={draggingTabDef?.symbol} />
       </DragOverlay>
+
+      <ConnectionLost visible={!isConnected} />
     </DndContext>
   );
 }

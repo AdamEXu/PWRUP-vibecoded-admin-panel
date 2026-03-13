@@ -35,6 +35,12 @@ export interface AutobahnTopicUpdate {
   isConnected: boolean;
 }
 
+export interface MainWindowMockState {
+  enabled: boolean;
+  scenario: string | null;
+  url: string | null;
+}
+
 export interface BlitzRendererBridge {
   platform: string;
   electronVersion: string;
@@ -69,6 +75,8 @@ export interface BlitzRendererBridge {
   debug: {
     subscribeLaneToastPreview: (callback: (enabled: boolean) => void) => number;
     unsubscribeLaneToastPreview: (callbackId: number) => void;
+    getMainWindowMock: () => Promise<MainWindowMockState>;
+    setMainWindowMock: (scenario: string | null) => Promise<MainWindowMockState>;
   };
 }
 
@@ -91,6 +99,39 @@ export function hasBridge() {
 
 export function getBridge() {
   return requireBridge();
+}
+
+type MainWindowMockDebugBridge = {
+  getMainWindowMock: () => Promise<MainWindowMockState>;
+  setMainWindowMock: (scenario: string | null) => Promise<MainWindowMockState>;
+};
+
+function requireMainWindowMockDebugBridge(
+  bridge: BlitzRendererBridge,
+): MainWindowMockDebugBridge {
+  const debugBridge = bridge.debug as Partial<MainWindowMockDebugBridge>;
+  if (
+    typeof debugBridge.getMainWindowMock !== "function"
+    || typeof debugBridge.setMainWindowMock !== "function"
+  ) {
+    throw new Error(
+      "Main-window mock controls are unavailable in this runtime bridge. Restart the Electron app to load the latest preload.",
+    );
+  }
+
+  return debugBridge as MainWindowMockDebugBridge;
+}
+
+export function hasMainWindowMockControls() {
+  if (typeof window === "undefined" || !window.blitzRenderer) {
+    return false;
+  }
+
+  const debugBridge = window.blitzRenderer.debug as Partial<MainWindowMockDebugBridge>;
+  return (
+    typeof debugBridge.getMainWindowMock === "function"
+    && typeof debugBridge.setMainWindowMock === "function"
+  );
 }
 
 export async function subscribeSettings(
@@ -141,4 +182,18 @@ export function subscribeLaneToastPreview(
   return () => {
     bridge.debug.unsubscribeLaneToastPreview(callbackId);
   };
+}
+
+export async function getMainWindowMockState(): Promise<MainWindowMockState> {
+  const bridge = requireBridge();
+  const debugBridge = requireMainWindowMockDebugBridge(bridge);
+  return debugBridge.getMainWindowMock();
+}
+
+export async function setMainWindowMockState(
+  scenario: string | null,
+): Promise<MainWindowMockState> {
+  const bridge = requireBridge();
+  const debugBridge = requireMainWindowMockDebugBridge(bridge);
+  return debugBridge.setMainWindowMock(scenario);
 }

@@ -2,8 +2,11 @@
 
 import { AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { NetworkTablesTypeInfos } from "ntcore-ts-client";
 import { usePathLibrary } from "@/lib/hooks/usePathLibrary";
 import { usePathNetworkTable } from "@/lib/hooks/usePathNetworkTable";
+import { NT } from "@/lib/match/constants";
+import { useNTopic } from "@/lib/match/useNTopic";
 import { findMatchingPathName } from "@/lib/pathLibrary";
 import { PathDetailPane } from "./auto-selector/components/PathDetailPane";
 import { PathListPane } from "./auto-selector/components/PathListPane";
@@ -40,13 +43,17 @@ function setStoredSelectedAuto(pathName: string | null): void {
 export function AutoSelector() {
   const { paths, isLoading, error, reload } = usePathLibrary();
   const { isConnected, selectedAutoFromRobot, publishSelectedAuto } = usePathNetworkTable();
+  const { value: isMatchEnabled, isConnected: isMatchSignalConnected } = useNTopic<boolean>(
+    NT.MATCH_HUD_ENABLED,
+    NetworkTablesTypeInfos.kBoolean,
+    false,
+  );
 
   const [viewingPathName, setViewingPathName] = useState<string | null>(null);
   const [localSelectedPath, setLocalSelectedPath] = useState<string | null>(() => getStoredSelectedAuto());
   const [pendingPublish, setPendingPublish] = useState<string | null>(null);
   const [metadataByPathName, setMetadataByPathName] = useState<Record<string, AutoPathMetadata>>({});
   const [showConflictPopup, setShowConflictPopup] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const wasConnectedRef = useRef(false);
   const syncInFlightRef = useRef(false);
   const lastSyncAttemptMsRef = useRef(0);
@@ -65,6 +72,7 @@ export function AutoSelector() {
     const trimmed = selectedAutoFromRobot?.trim() ?? "";
     return trimmed.length > 0 ? trimmed : "NONE";
   }, [selectedAutoFromRobot]);
+  const isSelectionLocked = isMatchSignalConnected && isMatchEnabled;
 
   const activePathName = localMatchedPath ?? robotMatchedPath;
 
@@ -165,6 +173,10 @@ export function AutoSelector() {
 
   const publishDesiredAuto = useCallback(
     (pathName: string, throttle: boolean) => {
+      if (isSelectionLocked) {
+        return;
+      }
+
       if (throttle) {
         const now = Date.now();
         if (syncInFlightRef.current || now - lastSyncAttemptMsRef.current < SYNC_THROTTLE_MS) {
@@ -184,22 +196,25 @@ export function AutoSelector() {
           setPendingPublish((current) => (current === pathName ? null : current));
         });
     },
-    [publishSelectedAuto],
+    [isSelectionLocked, publishSelectedAuto],
   );
 
   const handleSelect = useCallback(
     (pathName: string) => {
+      if (isSelectionLocked) {
+        return;
+      }
       setLocalSelectedPath(pathName);
       publishDesiredAuto(pathName, false);
     },
-    [publishDesiredAuto],
+    [isSelectionLocked, publishDesiredAuto],
   );
 
   useEffect(() => {
     const justConnected = isConnected && !wasConnectedRef.current;
     wasConnectedRef.current = isConnected;
 
-    if (!isConnected || !localSelectedPath) {
+    if (!isConnected || !localSelectedPath || isSelectionLocked) {
       return;
     }
 
@@ -210,10 +225,17 @@ export function AutoSelector() {
     if (justConnected || !robotAligned) {
       publishDesiredAuto(localSelectedPath, true);
     }
-  }, [isConnected, localSelectedPath, normalizedRobotAuto, publishDesiredAuto, robotMatchedPath]);
+  }, [
+    isConnected,
+    isSelectionLocked,
+    localSelectedPath,
+    normalizedRobotAuto,
+    publishDesiredAuto,
+    robotMatchedPath,
+  ]);
 
   useEffect(() => {
-    if (!isConnected || !localSelectedPath) {
+    if (!isConnected || !localSelectedPath || isSelectionLocked) {
       previousRobotAutoRef.current = normalizedRobotAuto;
       mismatchTimestampsRef.current = [];
       return;
@@ -237,13 +259,15 @@ export function AutoSelector() {
     }
 
     previousRobotAutoRef.current = normalizedRobotAuto;
-  }, [isConnected, localSelectedPath, normalizedRobotAuto]);
+  }, [isConnected, isSelectionLocked, localSelectedPath, normalizedRobotAuto]);
 
   return (
     <div className="relative flex h-full w-full bg-[#272727]">
-      {!isConnected && (
-        <div className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded border border-rose-500/60 bg-black/85 px-3 py-1 text-[18px] text-rose-300">
-          NT disconnected
+      {isSelectionLocked && (
+        <div className="absolute inset-x-0 top-0 z-20 border-b border-amber-400/60 bg-amber-500/15 px-5 py-2">
+          <p className="text-[18px] leading-[1.2] font-semibold text-amber-100">
+            Auto selector locked while match is active.
+          </p>
         </div>
       )}
 
@@ -275,7 +299,8 @@ export function AutoSelector() {
               </button>
               <button
                 type="button"
-                className="bg-[#70cd35] px-4 py-2 text-[22px] leading-[1] text-white"
+                disabled={isSelectionLocked}
+                className="bg-[#70cd35] px-4 py-2 text-[22px] leading-[1] text-white disabled:opacity-50"
                 onClick={() => {
                   setShowConflictPopup(false);
                   if (localSelectedPath) {
@@ -299,7 +324,7 @@ export function AutoSelector() {
         activePathName={activePathName}
         viewingPathName={viewingPathName}
         onViewPath={setViewingPathName}
-        scrollRef={scrollRef}
+
       />
 
       <div className="flex h-full min-w-0 flex-1 overflow-clip bg-[#272727]">
@@ -315,6 +340,7 @@ export function AutoSelector() {
           isLoading={isLoading}
           isViewingActive={isViewingActive}
           pendingPublish={pendingPublish}
+          selectionLocked={isSelectionLocked}
           onSelect={handleSelect}
         />
       </div>

@@ -13,11 +13,11 @@ export function ConnectionLost({ visible }: Props) {
 
   return (
     <div
-      className="absolute bottom-5 left-6 flex items-center gap-2 z-50"
+      className="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-[9999] bg-black/85 border border-red-500/40 rounded px-3 py-1.5"
       role="status"
       aria-label="NetworkTables disconnected"
     >
-      <span className="animate-nt-pulse inline-block w-3 h-3 rounded-full bg-red-500" />
+      <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
       <span className="text-sm font-medium text-red-400 tracking-wide select-none">
         NT Disconnected
       </span>

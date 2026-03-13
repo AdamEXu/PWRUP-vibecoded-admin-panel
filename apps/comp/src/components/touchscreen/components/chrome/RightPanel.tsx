@@ -6,12 +6,14 @@ export function RightPanel({
   openPanel,
   displayPanel,
   onToggle,
+  onSwipeClose,
   style,
 }: {
   useOverlayRightPanel: boolean;
   openPanel: RightPanelId | null;
   displayPanel: RightPanelId | null;
   onToggle: (id: RightPanelId) => void;
+  onSwipeClose: () => void;
   style: React.CSSProperties;
 }) {
   return (
@@ -22,7 +24,12 @@ export function RightPanel({
       ].join(" ")}
       style={style}
     >
-      <RightSideContent openPanel={openPanel} displayPanel={displayPanel} onToggle={onToggle} />
+      <RightSideContent
+        openPanel={openPanel}
+        displayPanel={displayPanel}
+        onToggle={onToggle}
+        onSwipeClose={onSwipeClose}
+      />
     </div>
   );
 }

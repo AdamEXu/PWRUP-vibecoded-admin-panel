@@ -106,22 +106,18 @@
 }
 
 .animate-ts-slide-up {
-  animation: ts-slide-up 300ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  animation: ts-slide-up 200ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
   backface-visibility: hidden;
 }
 .animate-ts-slide-down {
-  animation: ts-slide-down 300ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-  backface-visibility: hidden;
-}
-.animate-ts-slide-in-right {
-  animation: ts-slide-in-right 300ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  animation: ts-slide-down 200ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
   backface-visibility: hidden;
 }
 .animate-ts-dock-up {
-  animation: ts-dock-up 250ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  animation: ts-dock-up 100ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
   backface-visibility: hidden;
 }
 .animate-ts-dock-down {
-  animation: ts-dock-down 250ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  animation: ts-dock-down 100ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
   backface-visibility: hidden;
 }

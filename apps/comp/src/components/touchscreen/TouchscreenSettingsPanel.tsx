@@ -27,16 +27,17 @@ export function TouchscreenSettingsPanel() {
   } = useTouchscreenSettingsForm();
 
   return (
-    <div className="flex h-full flex-col bg-[#181818]">
+    <div className="flex h-full flex-col bg-[#272727]">
       <SettingsHeader onReset={onReset} onSave={onSave} canSave={saveEnabled} />
 
       <div
         className={[
-          "min-h-0 flex-1 flex overflow-x-auto",
+          "min-h-0 flex-1 flex overflow-x-scroll",
           "[&::-webkit-scrollbar]:h-[5px]",
           "[&::-webkit-scrollbar-track]:bg-[#272727]",
           "[&::-webkit-scrollbar-thumb]:bg-[#70cd35]",
           "[&::-webkit-scrollbar-thumb]:rounded-none",
+          "[&::-webkit-scrollbar-thumb]:cursor-pointer",
         ].join(" ")}
       >
         <SettingsColumn title="Autobahn" bordered>

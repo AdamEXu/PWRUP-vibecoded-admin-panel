@@ -75,9 +75,21 @@ export function useTouchscreenLayoutState() {
     }
   }, [activeOverlayTab]);
 
+  /** Dismiss without exit animation — caller already animated the slide-out. */
+  const dismissOverlayImmediate = useCallback(() => {
+    setIsDockClosing(true);
+    setActiveOverlayTab(null);
+  }, []);
+
   const togglePanel = useCallback((panelId: RightPanelId) => {
     setIsDockClosing(true);
     setOpenRightPanel((current) => (current === panelId ? null : panelId));
+  }, []);
+
+  /** Close panel without width transition — caller already animated the slide-out. */
+  const closePanelImmediate = useCallback(() => {
+    setIsDockClosing(true);
+    setOpenRightPanel(null);
   }, []);
 
   const closeDock = useCallback(() => {
@@ -133,7 +145,9 @@ export function useTouchscreenLayoutState() {
     appLayerStyle,
     clearPrevOverlayTab,
     closeDock,
+    closePanelImmediate,
     dismissOverlay,
+    dismissOverlayImmediate,
     displayPanelId,
     dockIcons,
     driverLayerStyle,

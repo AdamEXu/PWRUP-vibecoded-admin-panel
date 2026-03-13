@@ -21,13 +21,13 @@ export function PathCard({
         isActive ? "border-[#70cd35]" : isViewing ? "border-white/30" : "border-transparent",
       ].join(" ")}
     >
-      <p className="w-full text-[40px] leading-[1] font-semibold text-white">{displayName}</p>
-      <p className="w-full text-[24px] leading-[1.1] text-white">
+      <p className="w-full text-[28px] leading-[1] font-semibold text-white">{displayName}</p>
+      <p className="w-full text-[18px] leading-[1.1] text-white">
         {description ?? ""}
       </p>
       <p
         className={[
-          "w-full text-[24px] leading-[1] font-bold",
+          "w-full text-[18px] leading-[1] font-bold",
           isActive ? "text-[#70cd35]" : "text-transparent",
         ].join(" ")}
       >

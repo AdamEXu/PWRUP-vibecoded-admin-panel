@@ -3,11 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { NetworkTablesTypeInfos } from "ntcore-ts-client";
 import { hasBridge, subscribeNtTopic } from "@/lib/blitzRenderer";
-
-const SHOULD_ADJUST_VELOCITY_TOPIC =
-  "/AdvantageKit/RealOutputs/SwerveSubsystem/ShouldAdjustVelocity";
-const ADJUSTING_VELOCITY_TOPIC =
-  "/AdvantageKit/RealOutputs/SwerveSubsystem/AdjustingVelocity";
+import {
+  ADJUSTING_VELOCITY_TOPIC,
+  SHOULD_ADJUST_VELOCITY_TOPIC,
+} from "./laneAlignmentTopics";
 
 interface LaneTopicSignal {
   hasValue: boolean;

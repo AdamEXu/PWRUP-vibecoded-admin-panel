@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AutoPathEntry } from "../types";
 
 export function PathDetailPane({
@@ -9,6 +9,7 @@ export function PathDetailPane({
   isLoading,
   isViewingActive,
   pendingPublish,
+  selectionLocked,
   onSelect,
 }: {
   viewingEntry: AutoPathEntry | null;
@@ -18,17 +19,18 @@ export function PathDetailPane({
   isLoading: boolean;
   isViewingActive: boolean;
   pendingPublish: string | null;
+  selectionLocked: boolean;
   onSelect: (pathName: string) => void;
 }) {
-  const [previewState, setPreviewState] = useState<"loading" | "loaded" | "error">("loading");
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [errorUrl, setErrorUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    setPreviewState("loading");
-  }, [previewUrl]);
+  const previewState =
+    errorUrl === previewUrl ? "error" : loadedUrl === previewUrl ? "loaded" : "loading";
 
   if (!viewingEntry) {
     return (
-      <div className="flex flex-1 items-center justify-center text-[48px] text-zinc-500">
+      <div className="flex flex-1 items-center justify-center text-[34px] text-zinc-500">
         <p>{isLoading ? "Loading..." : "Select a path"}</p>
       </div>
     );
@@ -38,29 +40,31 @@ export function PathDetailPane({
     <>
       <div className="flex h-full w-1/2 shrink-0 flex-col justify-between p-[16px]">
         <div className="flex flex-col gap-[10px] text-white">
-          <p className="text-[48px] leading-[1] font-semibold">{displayName ?? viewingEntry.name}</p>
+          <p className="text-[34px] leading-[1] font-semibold">{displayName ?? viewingEntry.name}</p>
           {description && (
-            <p className="max-w-[660px] text-[32px] leading-[1.2] text-white">{description}</p>
+            <p className="max-w-[660px] text-[22px] leading-[1.2] text-white">{description}</p>
           )}
           {!description && (
-            <p className="text-[32px] leading-[1.2] text-zinc-300">{viewingEntry.fileName}</p>
+            <p className="text-[22px] leading-[1.2] text-zinc-300">{viewingEntry.fileName}</p>
           )}
         </div>
 
         <button
           type="button"
-          disabled={pendingPublish !== null}
+          disabled={pendingPublish !== null || selectionLocked}
           onClick={() => onSelect(viewingEntry.name)}
           className={[
-            "self-start px-[10px] py-[4px] text-[48px] leading-[1] text-white whitespace-nowrap",
+            "self-start px-[10px] py-[4px] text-[34px] leading-[1] text-white whitespace-nowrap",
             isViewingActive ? "bg-[#70cd35]" : "bg-black active:bg-zinc-800",
-            pendingPublish ? "opacity-50" : "",
+            pendingPublish || selectionLocked ? "opacity-50" : "",
           ]
             .filter(Boolean)
             .join(" ")}
         >
           {pendingPublish === viewingEntry.name
             ? "Selecting..."
+            : selectionLocked
+              ? "Locked During Match"
             : isViewingActive
               ? "Selected"
               : "Select"}
@@ -72,7 +76,7 @@ export function PathDetailPane({
           {previewState !== "error" && previewUrl ? (
             <>
               {previewState === "loading" && (
-                <div className="absolute inset-0 flex items-center justify-center text-center text-[48px] text-zinc-500">
+                <div className="absolute inset-0 flex items-center justify-center text-center text-[34px] text-zinc-500">
                   <p>Loading preview...</p>
                 </div>
               )}
@@ -84,12 +88,12 @@ export function PathDetailPane({
                   "absolute inset-0 h-full w-full object-contain transition-opacity",
                   previewState === "loaded" ? "opacity-100" : "opacity-0",
                 ].join(" ")}
-                onLoad={() => setPreviewState("loaded")}
-                onError={() => setPreviewState("error")}
+                onLoad={() => setLoadedUrl(previewUrl)}
+                onError={() => setErrorUrl(previewUrl)}
               />
             </>
           ) : (
-            <div className="flex items-center justify-center text-center text-[48px] text-zinc-500">
+            <div className="flex items-center justify-center text-center text-[34px] text-zinc-500">
               <p>Error loading preview</p>
             </div>
           )}
