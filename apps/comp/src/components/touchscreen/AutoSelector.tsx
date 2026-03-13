@@ -132,7 +132,7 @@ export function AutoSelector() {
         scrollRef={scrollRef}
       />
 
-      <div className="flex h-full min-w-0 flex-1 overflow-clip">
+      <div className="flex h-full min-w-0 flex-1 overflow-clip bg-[#272727]">
         <PathDetailPane
           viewingEntry={viewingEntry}
           displayName={viewingMetadata?.name ?? viewingEntry?.name}

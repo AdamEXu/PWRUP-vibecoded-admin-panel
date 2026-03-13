@@ -64,11 +64,22 @@ export async function listPathLibraryEntries(): Promise<{
     };
   }
 
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-  const files = entries
+  const rootEntries = await fs.readdir(directory, { withFileTypes: true });
+  const rootFiles = rootEntries
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .filter((fileName) => ALLOWED_EXTENSION_SET.has(path.extname(fileName).toLowerCase()));
+  const files = [...rootFiles];
+
+  const animatedDirectory = path.join(directory, "animated");
+  if (await directoryExists(animatedDirectory)) {
+    const animatedEntries = await fs.readdir(animatedDirectory, { withFileTypes: true });
+    const animatedFiles = animatedEntries
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .filter((fileName) => ALLOWED_EXTENSION_SET.has(path.extname(fileName).toLowerCase()));
+    files.push(...animatedFiles);
+  }
 
   const byPathName = new Map<string, { name: string; fileName: string }>();
   for (const fileName of files) {
@@ -118,15 +129,24 @@ export async function readPathLibraryImage(fileName: string): Promise<{
   const directory = await resolvePathLibraryDirectory();
   if (!directory) return null;
 
-  const fullPath = path.join(directory, safeFileName);
   try {
+    const fullPath = path.join(directory, safeFileName);
     const content = await fs.readFile(fullPath);
     return {
       content,
       contentType: extensionToContentType(extension),
     };
   } catch {
-    return null;
+    try {
+      const animatedPath = path.join(directory, "animated", safeFileName);
+      const content = await fs.readFile(animatedPath);
+      return {
+        content,
+        contentType: extensionToContentType(extension),
+      };
+    } catch {
+      return null;
+    }
   }
 }
 

@@ -24,11 +24,11 @@ export function PathListPane({
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <div className="flex h-full w-[34%] shrink-0">
+    <div className="flex h-full w-1/3 shrink-0">
       <div
         ref={scrollRef}
         className={[
-          "flex flex-1 flex-col gap-2 overflow-y-auto p-2",
+          "flex flex-1 flex-col gap-[10px] overflow-y-auto p-[10px]",
           "[&::-webkit-scrollbar]:hidden",
         ].join(" ")}
       >
@@ -36,6 +36,7 @@ export function PathListPane({
           <PathCard
             key={entry.fileName}
             displayName={metadataByPathName[entry.name]?.name ?? entry.name}
+            description={metadataByPathName[entry.name]?.description}
             isActive={activePathName === entry.name}
             isViewing={viewingPathName === entry.name}
             onTap={() => onViewPath(entry.name)}
@@ -43,14 +44,14 @@ export function PathListPane({
         ))}
 
         {isLoading && (
-          <div className="flex w-full shrink-0 items-center justify-center p-8 bg-[#3c3c3c]">
-            <p className="text-base text-zinc-500">Loading paths...</p>
+          <div className="flex h-[180px] w-full shrink-0 items-center justify-center bg-[#3c3c3c] p-[10px]">
+            <p className="text-[24px] text-zinc-500">Loading paths...</p>
           </div>
         )}
 
         {!isLoading && paths.length === 0 && !error && (
-          <div className="flex w-full shrink-0 items-center justify-center p-8 bg-[#3c3c3c]">
-            <p className="text-base text-zinc-500">No paths found</p>
+          <div className="flex h-[180px] w-full shrink-0 items-center justify-center bg-[#3c3c3c] p-[10px]">
+            <p className="text-[24px] text-zinc-500">No paths found</p>
           </div>
         )}
 
@@ -58,9 +59,9 @@ export function PathListPane({
           <button
             type="button"
             onClick={() => void reload()}
-            className="flex w-full shrink-0 items-center justify-center p-8 bg-[#3c3c3c]"
+            className="flex h-[180px] w-full shrink-0 items-center justify-center bg-[#3c3c3c] p-[10px]"
           >
-            <p className="text-base text-rose-400">Failed to load. Tap to retry.</p>
+            <p className="text-[24px] text-rose-400">Failed to load. Tap to retry.</p>
           </button>
         )}
       </div>
