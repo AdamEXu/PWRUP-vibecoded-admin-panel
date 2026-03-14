@@ -6,6 +6,10 @@
   "scripts": {
     "dev:admin": "pnpm --filter @pwrup/admin dev",
     "dev:comp": "pnpm --filter @pwrup/comp dev",
+    "sync:pathplanner:dry": "./scripts/sync-pathplanner-from-fir.sh",
+    "sync:pathplanner": "./scripts/sync-pathplanner-from-fir.sh --apply",
+    "sync:autos:dry": "./scripts/sync-pathplanner-from-fir.sh --autos-only",
+    "sync:autos": "./scripts/sync-pathplanner-from-fir.sh --apply --autos-only",
     "build:admin": "pnpm --filter @pwrup/admin build",
     "build:comp": "pnpm --filter @pwrup/comp build",
     "dist:admin": "pnpm --filter @pwrup/admin dist",

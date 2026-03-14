@@ -7,6 +7,10 @@ const ALLOWED_EXTENSION_SET = new Set<string>(ALLOWED_EXTENSIONS);
 
 const DEFAULT_LIBRARY_DIR = "path-library";
 const LEGACY_PUBLIC_LIBRARY_DIR = "public/path-overview";
+const DEFAULT_AUTO_LIBRARY_DIRS = [
+  "apps/comp/public/pathplanner/autos",
+  "public/pathplanner/autos",
+] as const;
 
 function extensionPriority(fileName: string): number {
   const extension = path.extname(fileName).toLowerCase();
@@ -52,18 +56,50 @@ export async function resolvePathLibraryDirectory(): Promise<string | null> {
   return null;
 }
 
-export async function listPathLibraryEntries(): Promise<{
-  paths: PathLibraryEntry[];
-  directoryLabel: string;
-}> {
-  const directory = await resolvePathLibraryDirectory();
-  if (!directory) {
-    return {
-      paths: [],
-      directoryLabel: process.env.BLITZ_PATH_LIBRARY_DIR?.trim() || DEFAULT_LIBRARY_DIR,
-    };
+export async function resolveAutoLibraryDirectory(): Promise<string | null> {
+  for (const relativeDirectory of DEFAULT_AUTO_LIBRARY_DIRS) {
+    const candidate = path.join(process.cwd(), relativeDirectory);
+    if (await directoryExists(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+async function listAutosDirectoryEntries(directory: string): Promise<PathLibraryEntry[]> {
+  const rootEntries = await fs.readdir(directory, { withFileTypes: true });
+  const files = rootEntries
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .filter((fileName) => path.extname(fileName).toLowerCase() === ".auto");
+
+  const byAutoName = new Map<string, { name: string; fileName: string }>();
+  for (const fileName of files) {
+    const fileStem = path.parse(fileName).name.trim();
+    if (!fileStem) continue;
+
+    const normalizedNameKey = fileStem.toLowerCase();
+    const existing = byAutoName.get(normalizedNameKey);
+    if (!existing) {
+      byAutoName.set(normalizedNameKey, { name: fileStem, fileName });
+      continue;
+    }
+
+    if (fileName.localeCompare(existing.fileName, undefined, { sensitivity: "base" }) < 0) {
+      byAutoName.set(normalizedNameKey, { name: fileStem, fileName });
+    }
   }
 
+  return Array.from(byAutoName.values())
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+    .map<PathLibraryEntry>((entry) => ({
+      name: entry.name,
+      fileName: entry.fileName,
+      imageUrl: `/path-overview/animated/${encodeURIComponent(entry.name)}.gif`,
+    }));
+}
+
+async function listImageDirectoryEntries(directory: string): Promise<PathLibraryEntry[]> {
   const rootEntries = await fs.readdir(directory, { withFileTypes: true });
   const rootFiles = rootEntries
     .filter((entry) => entry.isFile())
@@ -98,16 +134,37 @@ export async function listPathLibraryEntries(): Promise<{
     }
   }
 
-  const paths = Array.from(byPathName.values())
+  return Array.from(byPathName.values())
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
     .map<PathLibraryEntry>((entry) => ({
       name: entry.name,
       fileName: entry.fileName,
       imageUrl: `/api/paths/library/image/${encodeURIComponent(entry.fileName)}`,
     }));
+}
+
+export async function listPathLibraryEntries(): Promise<{
+  paths: PathLibraryEntry[];
+  directoryLabel: string;
+}> {
+  const autosDirectory = await resolveAutoLibraryDirectory();
+  if (autosDirectory) {
+    return {
+      paths: await listAutosDirectoryEntries(autosDirectory),
+      directoryLabel: path.relative(process.cwd(), autosDirectory) || autosDirectory,
+    };
+  }
+
+  const directory = await resolvePathLibraryDirectory();
+  if (!directory) {
+    return {
+      paths: [],
+      directoryLabel: process.env.BLITZ_PATH_LIBRARY_DIR?.trim() || DEFAULT_LIBRARY_DIR,
+    };
+  }
 
   return {
-    paths,
+    paths: await listImageDirectoryEntries(directory),
     directoryLabel: path.relative(process.cwd(), directory) || directory,
   };
 }
