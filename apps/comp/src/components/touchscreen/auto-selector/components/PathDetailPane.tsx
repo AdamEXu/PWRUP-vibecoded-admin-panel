@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AutoPathEntry } from "../types";
 
 export function PathDetailPane({
@@ -24,6 +24,21 @@ export function PathDetailPane({
 }) {
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const [errorUrl, setErrorUrl] = useState<string | null>(null);
+  const [errorImages, setErrorImages] = useState<{ image: string; text: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/path-overview/meta/error-images.json")
+      .then((r) => r.json())
+      .then(setErrorImages)
+      .catch(() => {});
+  }, []);
+
+  const errorEntry = useMemo(
+    () => errorImages[Math.floor(Math.random() * errorImages.length)] ?? { image: "/path-overview/static/Glare.webp", text: "Howard is unhappy now" },
+    // re-roll when a different path errors
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [errorImages, errorUrl, viewingEntry],
+  );
 
   const previewState =
     errorUrl === previewUrl ? "error" : loadedUrl === previewUrl ? "loaded" : "loading";
@@ -93,9 +108,21 @@ export function PathDetailPane({
               />
             </>
           ) : (
-            <div className="flex items-center justify-center text-center text-[34px] text-zinc-500">
-              <p>Error loading preview</p>
-            </div>
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={errorEntry.image}
+                alt="Preview unavailable"
+                className="absolute inset-0 h-full w-full object-contain"
+              />
+              <div className="relative z-10 bg-black/60 px-3 py-1 text-[28px] font-semibold text-white text-center">
+                <p>Failed to load preview</p>
+                <p className="text-lg">{errorEntry.text}</p>
+                <p className="text-xs mt-2" style={{
+                  lineHeight: 1
+                }}>The error does <b className="bold italic">not</b> mean the auto is broken, you can select it and it'll probably still work?</p>
+              </div>
+            </>
           )}
         </div>
       </div>

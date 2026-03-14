@@ -72,7 +72,7 @@ function normalizeConnectionSettings(next = {}) {
 
 function normalizeHudVisibility(next = {}) {
   return {
-    showMap: typeof next.showMap === "boolean" ? next.showMap : DEFAULT_HUD_VISIBILITY.showMap,
+    showMap: false,
     showTimers: typeof next.showTimers === "boolean" ? next.showTimers : DEFAULT_HUD_VISIBILITY.showTimers,
     showStatus: typeof next.showStatus === "boolean" ? next.showStatus : DEFAULT_HUD_VISIBILITY.showStatus,
     showCamera: typeof next.showCamera === "boolean" ? next.showCamera : DEFAULT_HUD_VISIBILITY.showCamera,

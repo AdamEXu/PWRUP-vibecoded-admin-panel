@@ -59,8 +59,7 @@ function normalizeSettings(next: Partial<ConnectionSettings>): ConnectionSetting
 
 function normalizeHudVisibility(next: Partial<HudVisibilitySettings> | undefined): HudVisibilitySettings {
   return {
-    showMap:
-      typeof next?.showMap === "boolean" ? next.showMap : DEFAULT_HUD_VISIBILITY.showMap,
+    showMap: false,
     showTimers:
       typeof next?.showTimers === "boolean"
         ? next.showTimers

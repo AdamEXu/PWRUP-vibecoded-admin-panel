@@ -136,7 +136,7 @@ function normalizeSettings(parsed: Partial<ConnectionSettings>): ConnectionSetti
 
 function normalizeHudVisibility(parsed: Partial<HudVisibilitySettings> | undefined): HudVisibilitySettings {
   return {
-    showMap: typeof parsed?.showMap === "boolean" ? parsed.showMap : DEFAULT_HUD_VISIBILITY.showMap,
+    showMap: false,
     showTimers:
       typeof parsed?.showTimers === "boolean" ? parsed.showTimers : DEFAULT_HUD_VISIBILITY.showTimers,
     showStatus:

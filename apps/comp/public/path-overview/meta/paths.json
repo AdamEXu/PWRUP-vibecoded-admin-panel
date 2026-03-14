@@ -36,7 +36,6 @@
     },
     "Stay And Shoot": {
         "name": "Stay And Shoot",
-        "description": "Stays at starting position and shoots initial fuel payload into the hub",
-        "preview": "/path-overview/static/Stay And Shoot.webp"
+        "description": "Stays at starting position and shoots initial fuel payload into the hub"
     }
 }

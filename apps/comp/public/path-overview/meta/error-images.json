@@ -1,0 +1,34 @@
+[
+    {
+        "image": "/path-overview/static/Glare.webp",
+        "text": "Howard is unhappy now"
+    },
+    {
+        "image": "/path-overview/static/Boba.webp",
+        "text": "Howard needs a boba break now"
+    },
+    {
+        "image": "/path-overview/static/Email.webp",
+        "text": "Howard is writing an angry email about this"
+    },
+    {
+        "image": "/path-overview/static/History.webp",
+        "text": "Howard is writing up a report on this"
+    },
+    {
+        "image": "/path-overview/static/Shocked.webp",
+        "text": "Howard is pensively thinking about this"
+    },
+    {
+        "image": "/path-overview/static/FunnyNumber.webp",
+        "text": "Howard got distracted by the funny number"
+    },
+    {
+        "image": "/path-overview/static/Cookie.webp",
+        "text": "Howard needs a cookie break now"
+    },
+    {
+        "image": "/path-overview/static/Photography.webp",
+        "text": "Howard is taking a picture of this"
+    }
+]
