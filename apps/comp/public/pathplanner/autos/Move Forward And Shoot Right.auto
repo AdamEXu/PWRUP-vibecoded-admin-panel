@@ -5,15 +5,15 @@
     "data": {
       "commands": [
         {
-          "type": "deadline",
+          "type": "path",
+          "data": {
+            "pathName": "Move Forward Right"
+          }
+        },
+        {
+          "type": "parallel",
           "data": {
             "commands": [
-              {
-                "type": "path",
-                "data": {
-                  "pathName": "Climber Right Left"
-                }
-              },
               {
                 "type": "named",
                 "data": {
@@ -25,20 +25,20 @@
                 "data": {
                   "name": "ContinuousShooterCommand"
                 }
+              },
+              {
+                "type": "named",
+                "data": {
+                  "name": "IntakeMiddleCommand"
+                }
               }
             ]
-          }
-        },
-        {
-          "type": "named",
-          "data": {
-            "name": "ClimberL1Command"
           }
         }
       ]
     }
   },
-  "resetOdom": true,
-  "folder": "Climber",
+  "resetOdom": false,
+  "folder": "Move Forward",
   "choreoAuto": false
 }
