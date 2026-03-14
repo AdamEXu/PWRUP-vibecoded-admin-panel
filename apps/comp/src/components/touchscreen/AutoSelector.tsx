@@ -9,7 +9,7 @@ import { NT } from "@/lib/match/constants";
 import { useNTopic } from "@/lib/match/useNTopic";
 import { findMatchingPathName } from "@/lib/pathLibrary";
 import { PathDetailPane } from "./auto-selector/components/PathDetailPane";
-import { PathListPane } from "./auto-selector/components/PathListPane";
+import { NO_AUTO_SENTINEL, PathListPane } from "./auto-selector/components/PathListPane";
 import type { AutoPathMetadata } from "./auto-selector/types";
 
 const SELECTED_AUTO_STORAGE_KEY = "blitz.touchscreen.auto.selected";
@@ -74,7 +74,9 @@ export function AutoSelector() {
   }, [selectedAutoFromRobot]);
   const isSelectionLocked = isMatchSignalConnected && isMatchEnabled;
 
-  const activePathName = localMatchedPath ?? robotMatchedPath;
+  const activePathName = localSelectedPath === NO_AUTO_SENTINEL
+    ? NO_AUTO_SENTINEL
+    : (localMatchedPath ?? robotMatchedPath);
 
   useEffect(() => {
     if (viewingPathName) {
@@ -163,7 +165,7 @@ export function AutoSelector() {
   }, [localSelectedPath]);
 
   useEffect(() => {
-    if (paths.length === 0 || !localSelectedPath) {
+    if (paths.length === 0 || !localSelectedPath || localSelectedPath === NO_AUTO_SENTINEL) {
       return;
     }
     if (!localMatchedPath) {
@@ -205,7 +207,7 @@ export function AutoSelector() {
         return;
       }
       setLocalSelectedPath(pathName);
-      publishDesiredAuto(pathName, false);
+      publishDesiredAuto(pathName === NO_AUTO_SENTINEL ? "" : pathName, false);
     },
     [isSelectionLocked, publishDesiredAuto],
   );
@@ -215,6 +217,14 @@ export function AutoSelector() {
     wasConnectedRef.current = isConnected;
 
     if (!isConnected || !localSelectedPath || isSelectionLocked) {
+      return;
+    }
+
+    if (localSelectedPath === NO_AUTO_SENTINEL) {
+      const robotIsNone = normalizedRobotAuto === "NONE";
+      if (justConnected || !robotIsNone) {
+        publishDesiredAuto("", true);
+      }
       return;
     }
 
@@ -328,21 +338,53 @@ export function AutoSelector() {
       />
 
       <div className="flex h-full min-w-0 flex-1 overflow-clip bg-[#272727]">
-        <PathDetailPane
-          viewingEntry={viewingEntry}
-          displayName={viewingMetadata?.name ?? viewingEntry?.name}
-          description={viewingMetadata?.description}
-          previewUrl={
-            viewingEntry
-              ? `/path-overview/animated/${encodeURIComponent(viewingEntry.name)}.gif`
-              : null
-          }
-          isLoading={isLoading}
-          isViewingActive={isViewingActive}
-          pendingPublish={pendingPublish}
-          selectionLocked={isSelectionLocked}
-          onSelect={handleSelect}
-        />
+        {viewingPathName === NO_AUTO_SENTINEL ? (
+          <div className="flex h-full w-1/2 shrink-0 flex-col justify-between p-[16px]">
+            <div className="flex flex-col gap-[10px] text-white">
+              <p className="text-[34px] leading-[1] font-semibold">No Auto</p>
+              <p className="text-[22px] leading-[1.2] text-zinc-300">
+                Do not run an autonomous routine. The robot will stay still during autonomous.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={pendingPublish !== null || isSelectionLocked}
+              onClick={() => handleSelect(NO_AUTO_SENTINEL)}
+              className={[
+                "self-start px-[10px] py-[4px] text-[34px] leading-[1] text-white whitespace-nowrap",
+                activePathName === NO_AUTO_SENTINEL ? "bg-[#70cd35]" : "bg-black active:bg-zinc-800",
+                pendingPublish || isSelectionLocked ? "opacity-50" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {pendingPublish === ""
+                ? "Selecting..."
+                : isSelectionLocked
+                  ? "Locked During Match"
+                  : activePathName === NO_AUTO_SENTINEL
+                    ? "Selected"
+                    : "Select"}
+            </button>
+          </div>
+        ) : (
+          <PathDetailPane
+            viewingEntry={viewingEntry}
+            displayName={viewingMetadata?.name ?? viewingEntry?.name}
+            description={viewingMetadata?.description}
+            previewUrl={
+              viewingEntry
+                ? `/path-overview/animated/${encodeURIComponent(viewingEntry.name)}.gif`
+                : null
+            }
+            isLoading={isLoading}
+            isViewingActive={isViewingActive}
+            pendingPublish={pendingPublish}
+            selectionLocked={isSelectionLocked}
+            onSelect={handleSelect}
+          />
+        )}
       </div>
     </div>
   );

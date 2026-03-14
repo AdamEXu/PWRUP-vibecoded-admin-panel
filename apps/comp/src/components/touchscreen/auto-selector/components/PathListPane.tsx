@@ -2,6 +2,8 @@ import type { AutoPathEntry, AutoPathMetadata } from "../types";
 import { colScroll } from "../../settings/constants";
 import { PathCard } from "./PathCard";
 
+export const NO_AUTO_SENTINEL = "NONE";
+
 export function PathListPane({
   paths,
   metadataByPathName,
@@ -28,6 +30,14 @@ export function PathListPane({
         colScroll,
       ].join(" ")}
     >
+      <PathCard
+        displayName="No Auto"
+        description="Do not run an autonomous routine"
+        isActive={activePathName === NO_AUTO_SENTINEL}
+        isViewing={viewingPathName === NO_AUTO_SENTINEL}
+        onTap={() => onViewPath(NO_AUTO_SENTINEL)}
+      />
+
       {paths.map((entry) => (
         <PathCard
           key={entry.fileName}

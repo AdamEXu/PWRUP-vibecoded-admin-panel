@@ -66,6 +66,14 @@ export function MatchHUD() {
   const mockState = useMockMatchState();
   const state = isMock ? mockState : realState;
 
+  // Reset lane alignment tracking when a new match starts so toasts fire correctly
+  useEffect(() => {
+    if (state.matchPhase === "pre_match") {
+      hasSeenLaneAlignmentValueRef.current = false;
+      lastLaneAlignmentValueRef.current = null;
+    }
+  }, [state.matchPhase]);
+
   useEffect(() => {
     if (!laneAlignmentSignal.hasValue || laneAlignmentSignal.value === null) {
       return;
