@@ -59,6 +59,7 @@ export const NT = {
   MATCH_HUD_AUTO_ALIGN_DISTANCE: `${MATCH_HUD_ROOT}/auto_align_distance_m`,
   MATCH_HUD_AUTO_ALIGN_READY: `${MATCH_HUD_ROOT}/auto_align_ready`,
   MATCH_HUD_DRIVER_OVERRIDE: `${MATCH_HUD_ROOT}/driver_override`,
+  MATCH_HUD_AIM_MODE: `${MATCH_HUD_ROOT}/aim_mode`,
   MATCH_HUD_CAMERA_TOPIC: `${MATCH_HUD_ROOT}/camera_topic`,
 } as const;
 

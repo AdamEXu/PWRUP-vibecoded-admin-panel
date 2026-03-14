@@ -141,6 +141,7 @@ export function MatchHUD() {
       {hudVisibility.showStatus && (
         <ShiftIndicator
           hubStatus={state.hubStatus}
+          aimMode={state.aimMode}
           matchPhase={state.matchPhase}
           periodTimeRemaining={state.fmsMatchTime}
           shiftTimeRemaining={state.shiftTimeRemaining}

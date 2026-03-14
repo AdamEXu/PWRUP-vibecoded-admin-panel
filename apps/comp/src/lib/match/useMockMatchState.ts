@@ -154,6 +154,7 @@ export function useMockMatchState(): MatchState {
   const driverOverride = false;
   const autoAlignActive = scenario === "camera";
   const autoAlignReady = false;
+  const aimMode: MatchState["aimMode"] = "gps_auto";
 
   const derived = computeDerivedMatchState({
     fmsControlData,
@@ -190,6 +191,7 @@ export function useMockMatchState(): MatchState {
     autoAlignDistance: 1.8,
     autoAlignReady,
     driverOverride,
+    aimMode,
     bufferRemaining,
     showShiftIndicator,
     showBuffer,

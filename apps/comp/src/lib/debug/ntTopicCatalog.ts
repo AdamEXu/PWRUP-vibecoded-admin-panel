@@ -223,6 +223,14 @@ const MATCH_HUD_TOPIC_TEMPLATES: readonly NtTopicTemplate[] = [
     group: "match_hud",
   },
   {
+    id: "matchHud.aimMode",
+    topicPath: NT.MATCH_HUD_AIM_MODE,
+    type: "integer",
+    typeInfo: NetworkTablesTypeInfos.kInteger,
+    defaultValue: 0,
+    group: "match_hud",
+  },
+  {
     id: "matchHud.cameraTopic",
     topicPath: NT.MATCH_HUD_CAMERA_TOPIC,
     type: "string",

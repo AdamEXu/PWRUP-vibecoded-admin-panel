@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { HubStatus, MatchPhase } from "@/lib/match/types";
+import type { AimMode, HubStatus, MatchPhase } from "@/lib/match/types";
 import { HubStatusIcon } from "./HubStatusIcon";
 
 interface Props {
   hubStatus: HubStatus;
+  aimMode: AimMode;
   matchPhase: MatchPhase;
   periodTimeRemaining: number;
   shiftTimeRemaining: number;
@@ -25,6 +26,7 @@ interface Props {
  */
 export function ShiftIndicator({
   hubStatus,
+  aimMode,
   matchPhase,
   periodTimeRemaining,
   shiftTimeRemaining,
@@ -133,7 +135,7 @@ export function ShiftIndicator({
         }}
       >
         <p>
-          <HubStatusIcon status={hubStatus} size="10.42vw" />
+          <HubStatusIcon aimMode={aimMode} size="10.42vw" />
           {/* Match Figma: explicit large-font space between symbol and number */}
           <span
             className="select-none"

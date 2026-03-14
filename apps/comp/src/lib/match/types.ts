@@ -18,6 +18,7 @@ export type HubStatus =
   | "none";     // Neither hub active (shouldn't happen, fallback)
 
 export type HeaderColor = "green" | "yellow" | "purple" | "hidden";
+export type AimMode = "shooter_disabled" | "gps_auto" | "manual_aiming";
 
 export interface MatchState {
   // Published match state
@@ -39,6 +40,7 @@ export interface MatchState {
   autoAlignDistance: number;
   autoAlignReady: boolean;
   driverOverride: boolean;
+  aimMode: AimMode;
 
   // Derived
   matchPhase: MatchPhase;

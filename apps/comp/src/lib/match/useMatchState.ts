@@ -59,6 +59,18 @@ function mapHeaderColor(color: number): MatchState["headerColor"] {
   }
 }
 
+function mapAimMode(mode: number): MatchState["aimMode"] {
+  switch (mode) {
+    case 1:
+      return "gps_auto";
+    case 2:
+      return "manual_aiming";
+    case 0:
+    default:
+      return "shooter_disabled";
+  }
+}
+
 export function useMatchState(): MatchState {
   const { value: seq, isConnected: ntConnected } = useNTopic<number>(
     NT.MATCH_HUD_SEQ,
@@ -175,6 +187,11 @@ export function useMatchState(): MatchState {
     NetworkTablesTypeInfos.kBoolean,
     false,
   );
+  const { value: aimMode } = useNTopic<number>(
+    NT.MATCH_HUD_AIM_MODE,
+    NetworkTablesTypeInfos.kInteger,
+    0,
+  );
   const { value: cameraTopic } = useNTopic<string>(
     NT.MATCH_HUD_CAMERA_TOPIC,
     NetworkTablesTypeInfos.kString,
@@ -196,6 +213,7 @@ export function useMatchState(): MatchState {
     autoAlignDistance,
     autoAlignReady,
     driverOverride,
+    aimMode: mapAimMode(aimMode),
     matchPhase: mapMatchPhase(phase),
     totalTimeRemaining,
     shiftTimeRemaining,
