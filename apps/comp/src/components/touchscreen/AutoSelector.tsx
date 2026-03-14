@@ -10,7 +10,7 @@ import { useNTopic } from "@/lib/match/useNTopic";
 import { findMatchingPathName } from "@/lib/pathLibrary";
 import { PathDetailPane } from "./auto-selector/components/PathDetailPane";
 import { NO_AUTO_SENTINEL, PathListPane } from "./auto-selector/components/PathListPane";
-import type { AutoPathMetadata } from "./auto-selector/types";
+import type { AutoPathMetadata, PathsMetadataMap } from "./auto-selector/types";
 
 const SELECTED_AUTO_STORAGE_KEY = "blitz.touchscreen.auto.selected";
 const SYNC_THROTTLE_MS = 700;
@@ -103,56 +103,40 @@ export function AutoSelector() {
   useEffect(() => {
     let disposed = false;
 
-    const names = Array.from(new Set(paths.map((entry) => entry.name.trim()).filter(Boolean)));
-    if (names.length === 0) {
+    if (paths.length === 0) {
       setMetadataByPathName({});
       return;
     }
 
     void (async () => {
-      const loaded = await Promise.all(
-        names.map(async (name): Promise<[string, AutoPathMetadata | null]> => {
-          try {
-            const response = await fetch(`/path-overview/meta/${encodeURIComponent(name)}.json`, {
-              cache: "no-store",
-            });
-            if (!response.ok) {
-              return [name, null];
-            }
+      try {
+        const response = await fetch("/path-overview/meta/paths.json", {
+          cache: "no-store",
+        });
+        if (!response.ok || disposed) return;
 
-            const parsed = (await response.json()) as {
-              name?: unknown;
-              description?: unknown;
-            };
-            const metadataName =
-              typeof parsed.name === "string" && parsed.name.trim().length > 0
-                ? parsed.name.trim()
-                : undefined;
-            const description =
-              typeof parsed.description === "string" && parsed.description.trim().length > 0
-                ? parsed.description.trim()
-                : undefined;
-            if (!metadataName && !description) {
-              return [name, null];
-            }
-            return [name, { name: metadataName, description }];
-          } catch {
-            return [name, null];
+        const parsed = (await response.json()) as PathsMetadataMap;
+        if (disposed) return;
+
+        const nextMetadataByPathName: Record<string, AutoPathMetadata> = {};
+        for (const [key, entry] of Object.entries(parsed)) {
+          const name = typeof entry.name === "string" && entry.name.trim().length > 0
+            ? entry.name.trim()
+            : undefined;
+          const description = typeof entry.description === "string" && entry.description.trim().length > 0
+            ? entry.description.trim()
+            : undefined;
+          const preview = typeof entry.preview === "string" && entry.preview.trim().length > 0
+            ? entry.preview.trim()
+            : undefined;
+          if (name || description) {
+            nextMetadataByPathName[key] = { name, description, preview };
           }
-        }),
-      );
-
-      if (disposed) {
-        return;
-      }
-
-      const nextMetadataByPathName: Record<string, AutoPathMetadata> = {};
-      for (const [name, metadata] of loaded) {
-        if (metadata) {
-          nextMetadataByPathName[name] = metadata;
         }
+        setMetadataByPathName(nextMetadataByPathName);
+      } catch {
+        // Ignore fetch errors.
       }
-      setMetadataByPathName(nextMetadataByPathName);
     })();
 
     return () => {
@@ -374,9 +358,10 @@ export function AutoSelector() {
             displayName={viewingMetadata?.name ?? viewingEntry?.name}
             description={viewingMetadata?.description}
             previewUrl={
-              viewingEntry
-                ? `/path-overview/animated/${encodeURIComponent(viewingEntry.name)}.gif`
-                : null
+              viewingMetadata?.preview
+                ?? (viewingEntry
+                  ? `/path-overview/animated/${encodeURIComponent(viewingEntry.name)}.gif`
+                  : null)
             }
             isLoading={isLoading}
             isViewingActive={isViewingActive}
