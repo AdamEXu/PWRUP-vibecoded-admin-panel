@@ -37,7 +37,7 @@ export const DEFAULTS: ConnectionSettings = {
 };
 
 export const DEFAULT_HUD_VISIBILITY: HudVisibilitySettings = {
-  showMap: true,
+  showMap: false,
   showTimers: true,
   showStatus: true,
   showCamera: true,

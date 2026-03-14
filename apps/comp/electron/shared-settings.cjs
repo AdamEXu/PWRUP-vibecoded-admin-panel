@@ -15,7 +15,7 @@ const DEFAULTS = {
 };
 
 const DEFAULT_HUD_VISIBILITY = {
-  showMap: true,
+  showMap: false,
   showTimers: true,
   showStatus: true,
   showCamera: true,
