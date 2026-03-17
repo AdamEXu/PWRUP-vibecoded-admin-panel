@@ -43,5 +43,20 @@
         "image": "/path-overview/static/Amused.webp",
         "text": "Howard is amused by this",
         "happy-text": "Howard looking at the camera, amused"
+    },
+    {
+        "image": "/path-overview/static/Carry.webp",
+        "text": "Howard is busy carrying these seat cushions right now",
+        "happy-text": "Howard carrying a stack of seat cushions"
+    },
+    {
+        "image": "/path-overview/static/Scroll.webp",
+        "text": "Howard is busy scrolling Instagram Reels right now",
+        "happy-text": "Howard scrolling on his iPhone 15 Plus, likely looking at Instagram Reels"
+    },
+    {
+        "image": "/path-overview/static/Watch.webp",
+        "text": "Howard is watching a tutorial on how to fix this",
+        "happy-text": "Howard watching funny cat videos on his iPhone 15 Plus"
     }
 ]
