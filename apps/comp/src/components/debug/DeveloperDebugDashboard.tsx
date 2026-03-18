@@ -1,11 +1,17 @@
 "use client";
 
 import type { ChangeEvent } from "react";
+import dynamic from "next/dynamic";
 import {
   type NtDebugTopicType,
   type NtDebugTopicValue,
 } from "@/lib/debug/ntTopicCatalog";
 import { useDeveloperDebugDashboard } from "@/lib/debug/useDeveloperDebugDashboard";
+
+const Robot3DTab = dynamic(
+  () => import("@/components/touchscreen/tabs/Robot3DTab").then((m) => m.Robot3DTab),
+  { ssr: false, loading: () => <div className="flex h-96 items-center justify-center text-sm text-zinc-500">Loading 3D viewer…</div> },
+);
 
 function formatValue(value: NtDebugTopicValue, type: NtDebugTopicType): string {
   if (type === "string") {
@@ -151,7 +157,7 @@ export function DeveloperDebugDashboard() {
   } = useDeveloperDebugDashboard();
 
   return (
-    <main className="min-h-screen bg-[#0e1014] text-zinc-100">
+    <main className="h-screen overflow-y-auto bg-[#0e1014] text-zinc-100">
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-4 p-4">
         <header className="rounded border border-zinc-800 bg-zinc-900/80 p-4">
           <h1 className="text-lg font-semibold tracking-wide">Developer Debug Dashboard</h1>
@@ -162,6 +168,15 @@ export function DeveloperDebugDashboard() {
             Last local override change: {formatLastUpdated(lastOverrideAppliedMs)}
           </p>
         </header>
+
+        <section className="h-[480px] overflow-hidden rounded border border-zinc-800 bg-zinc-900/80">
+          <p className="border-b border-zinc-800 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            Robot 3D Preview
+          </p>
+          <div className="h-[calc(100%-33px)]">
+            <Robot3DTab />
+          </div>
+        </section>
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr),minmax(320px,420px)]">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -290,7 +305,7 @@ export function DeveloperDebugDashboard() {
 
           <div className="max-h-[65vh] overflow-auto">
             <table className="w-full min-w-[1360px] border-collapse text-left text-xs">
-              <thead className="sticky top-0 bg-zinc-950">
+              <thead className="sticky top-0 bg-zinc-950 backdrop-blur-lg">
                 <tr className="border-b border-zinc-800 text-zinc-300">
                   <th className="px-3 py-2 font-medium">Topic</th>
                   <th className="px-3 py-2 font-medium">Group</th>

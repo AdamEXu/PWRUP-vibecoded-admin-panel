@@ -91,6 +91,6 @@ export function saveLayoutState(leftRailIcons: OverlayTabId[], dockOrder: Overla
 export function dockIconsFromOrder(order: OverlayTabId[]): DockIcon[] {
   return order.map((tabId) => {
     const tab = ALL_TABS.find((entry) => entry.id === tabId)!;
-    return { id: tab.id, symbol: tab.symbol };
+    return { id: tab.id, symbol: tab.symbol, activeSymbol: tab.activeSymbol };
   });
 }

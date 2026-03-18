@@ -1,0 +1,112 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "three";
+
+export interface JointValue {
+  /** Exact node name from the GLB */
+  nodeName: string;
+  /** Rotation axis in local space, e.g. [0,1,0] */
+  axis: [number, number, number];
+  /** Angle in radians (revolute) or meters (prismatic) */
+  value: number;
+  type: "revolute" | "prismatic";
+}
+
+function Scene({ modelUrl, joints }: { modelUrl: string; joints: JointValue[] }) {
+  const { camera, gl, scene } = useThree();
+  const sceneRootRef = useRef<THREE.Object3D | null>(null);
+  const restQuatsRef = useRef<Map<string, THREE.Quaternion>>(new Map());
+  const restPosRef = useRef<Map<string, THREE.Vector3>>(new Map());
+
+  // OrbitControls
+  useEffect(() => {
+    const controls = new OrbitControls(camera, gl.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 0.2;
+    controls.maxDistance = 6;
+    return () => controls.dispose();
+  }, [camera, gl.domElement]);
+
+  // Load GLB
+  useEffect(() => {
+    const draco = new DRACOLoader();
+    draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+    const loader = new GLTFLoader();
+    loader.setDRACOLoader(draco);
+
+    loader.load(modelUrl, (gltf) => {
+      if (sceneRootRef.current) scene.remove(sceneRootRef.current);
+
+      // Capture rest transforms before any joint is applied
+      gltf.scene.traverse((node) => {
+        restQuatsRef.current.set(node.name, node.quaternion.clone());
+        restPosRef.current.set(node.name, node.position.clone());
+      });
+
+      gltf.scene.rotation.x = -Math.PI / 2;
+      sceneRootRef.current = gltf.scene;
+      scene.add(gltf.scene);
+    });
+
+    return () => {
+      if (sceneRootRef.current) {
+        scene.remove(sceneRootRef.current);
+        sceneRootRef.current = null;
+      }
+      draco.dispose();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelUrl]);
+
+  // Apply joints every frame
+  useFrame(() => {
+    const root = sceneRootRef.current;
+    if (!root) return;
+
+    for (const joint of joints) {
+      const node = root.getObjectByName(joint.nodeName);
+      if (!node) continue;
+
+      const restQuat = restQuatsRef.current.get(joint.nodeName);
+      const restPos = restPosRef.current.get(joint.nodeName);
+      if (!restQuat || !restPos) continue;
+
+      if (joint.type === "revolute") {
+        const axis = new THREE.Vector3(...joint.axis).normalize();
+        const q = new THREE.Quaternion().setFromAxisAngle(axis, joint.value);
+        node.quaternion.copy(restQuat).multiply(q);
+      } else {
+        const axis = new THREE.Vector3(...joint.axis).normalize();
+        node.position.copy(restPos).addScaledVector(axis, joint.value);
+      }
+    }
+  });
+
+  return (
+    <>
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[4, 8, 4]} intensity={1.2} />
+      <directionalLight position={[-4, 2, -4]} intensity={0.3} />
+      <gridHelper args={[3, 30, "#333", "#222"]} />
+    </>
+  );
+}
+
+export function RobotViewer({ modelUrl, joints }: { modelUrl: string; joints: JointValue[] }) {
+  return (
+    <Canvas
+      camera={{ position: [1.5, 1, 1.5], fov: 50, near: 0.01, far: 50 }}
+      gl={{ antialias: true }}
+      frameloop="always"
+      style={{ width: "100%", height: "100%" }}
+    >
+      <Scene modelUrl={modelUrl} joints={joints} />
+    </Canvas>
+  );
+}

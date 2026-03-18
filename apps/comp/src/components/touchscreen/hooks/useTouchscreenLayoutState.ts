@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ALL_TABS,
+  DEFAULT_DOCK_ORDER,
+  DEFAULT_LEFT_RAIL_ICONS,
   EASE,
   PANEL_DURATION,
   dockIconsFromOrder,
@@ -10,14 +12,20 @@ import {
 import type { DockIcon, OverlayTabId, RightPanelId } from "../model";
 
 export function useTouchscreenLayoutState() {
-  const [initialLayout] = useState(loadLayoutState);
   const [activeOverlayTab, setActiveOverlayTab] = useState<OverlayTabId | null>(null);
   const [prevOverlayTab, setPrevOverlayTab] = useState<OverlayTabId | null>(null);
   const [openRightPanel, setOpenRightPanel] = useState<RightPanelId | null>(null);
   const [isDockOpen, setIsDockOpen] = useState(false);
   const [isDockClosing, setIsDockClosing] = useState(false);
-  const [leftRailIcons, setLeftRailIcons] = useState<OverlayTabId[]>(initialLayout.leftRailIcons);
-  const [dockIcons, setDockIcons] = useState<DockIcon[]>(() => dockIconsFromOrder(initialLayout.dockOrder));
+  const [leftRailIcons, setLeftRailIcons] = useState<OverlayTabId[]>(DEFAULT_LEFT_RAIL_ICONS);
+  const [dockIcons, setDockIcons] = useState<DockIcon[]>(() => dockIconsFromOrder(DEFAULT_DOCK_ORDER));
+
+  // Load persisted layout after mount to avoid SSR/client hydration mismatch
+  useEffect(() => {
+    const layout = loadLayoutState();
+    setLeftRailIcons(layout.leftRailIcons);
+    setDockIcons(dockIconsFromOrder(layout.dockOrder));
+  }, []);
 
   const lastPanelRef = useRef<RightPanelId | null>(null);
   if (openRightPanel) {

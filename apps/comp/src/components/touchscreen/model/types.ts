@@ -1,4 +1,4 @@
-export type OverlayTabId = "auto" | "settings" | "effects" | "howard";
+export type OverlayTabId = "auto" | "settings" | "effects" | "howard" | "robot3d";
 
 export type RightPanelId = "showMap" | "showTimers" | "showStatus" | "showCamera";
 

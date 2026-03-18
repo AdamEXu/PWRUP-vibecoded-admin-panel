@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "model": "cad/Robot-Full.glb",
+  "rootTransform": {
+    "scale": [1, 1, 1],
+    "position": [0, 0, 0]
+  },
+  "joints": {
+    "elevator_inner": {
+      "nodeName": "InnerStage <1>",
+      "type": "prismatic",
+      "axis": [0, 1, 0],
+      "limits": { "min": 0, "max": 1.2 },
+      "defaultValue": 0,
+      "smoothing": 0.15,
+      "description": "Elevator inner stage vertical translation"
+    },
+    "launcher_pivot": {
+      "nodeName": "LauncherFull-V1.2 <1>",
+      "type": "revolute",
+      "axis": [1, 0, 0],
+      "limits": { "min": 0, "max": 1.2 },
+      "defaultValue": 0,
+      "smoothing": 0.1,
+      "description": "Launcher tilt angle"
+    },
+    "intake_wrist": {
+      "nodeName": "IntakeMain-V1.1 <1>",
+      "type": "revolute",
+      "axis": [1, 0, 0],
+      "limits": { "min": -1.57, "max": 0 },
+      "defaultValue": 0,
+      "ntTopic": "/AdvantageKit/RealOutputs/IntakeSubsystem/WristPosition",
+      "inputTransform": { "scale": -6.283185307179586, "offset": 0 },
+      "smoothing": 0.2,
+      "description": "Intake wrist pivot"
+    },
+    "indexer": {
+      "nodeName": "IndexFull-V1.2 <1>",
+      "type": "revolute",
+      "axis": [1, 0, 0],
+      "limits": { "min": -0.5, "max": 0.5 },
+      "defaultValue": 0,
+      "smoothing": 0.1,
+      "description": "Indexer mechanism angle"
+    },
+    "turret": {
+      "nodeName": "TurretRControl",
+      "type": "revolute",
+      "axis": [0, 1, 0],
+      "limits": { "min": -3.14, "max": 3.14 },
+      "defaultValue": 0,
+      "ntTopic": "/AdvantageKit/RealOutputs/Turret/PositionRot",
+      "inputWrap": "signedUnitRotation",
+      "inputTransform": { "scale": 6.283185307179586, "offset": 0 },
+      "description": "Turret rotation",
+      "debugSlider": { "label": "Turret", "step": 0.01 }
+    },
+    "turret_gear": {
+      "nodeName": "TurretGearRControl",
+      "type": "revolute",
+      "axis": [0, 1, 0],
+      "limits": { "min": -3.14, "max": 3.14 },
+      "defaultValue": 0,
+      "description": "Turret gear — driven opposite to turret by same motor",
+      "link": { "source": "turret", "scale": -1, "offset": 0 }
+    },
+    "climber_inner": {
+      "nodeName": "ClimberControlInner",
+      "type": "prismatic",
+      "axis": [0, 0, 1],
+      "limits": { "min": -1.5, "max": 1.5 },
+      "defaultValue": 0,
+      "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentPosition",
+      "description": "Climber inner stage",
+      "debugSlider": { "label": "Climber Inner", "step": 0.01 }
+    },
+    "climber_outer": {
+      "nodeName": "ClimberControlOuter",
+      "type": "prismatic",
+      "axis": [0, 0, 1],
+      "limits": { "min": -1.5, "max": 1.5 },
+      "defaultValue": 0,
+      "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentPosition",
+      "description": "Climber outer stage",
+      "debugSlider": { "label": "Climber Outer", "step": 0.01 }
+    },
+    "index_wrist": {
+      "nodeName": "IndexWristRControl",
+      "type": "revolute",
+      "axis": [1, 0, 0],
+      "limits": { "min": -3.14, "max": 3.14 },
+      "defaultValue": 0,
+      "description": "Index wrist pivot",
+      "debugSlider": { "label": "Index Wrist", "step": 0.01 }
+    }
+  }
+}
