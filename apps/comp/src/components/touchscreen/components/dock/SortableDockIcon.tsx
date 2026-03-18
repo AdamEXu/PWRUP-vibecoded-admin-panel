@@ -6,11 +6,13 @@ import { Sf } from "../common/Sf";
 export function SortableDockIcon({
   id,
   symbol,
+  activeSymbol,
   isActive,
   onTap,
 }: {
   id: string;
   symbol: string;
+  activeSymbol: string;
   isActive: boolean;
   onTap: () => void;
 }) {
@@ -36,7 +38,7 @@ export function SortableDockIcon({
       ].join(" ")}
       onClick={onTap}
     >
-      <Sf s={symbol} className="leading-[normal]" />
+      <Sf s={isActive ? activeSymbol : symbol} className="leading-[normal]" />
     </div>
   );
 }

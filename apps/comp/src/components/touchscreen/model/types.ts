@@ -19,4 +19,5 @@ export interface RightPanelDef {
 export interface DockIcon {
   id: OverlayTabId;
   symbol: string;
+  activeSymbol: string;
 }

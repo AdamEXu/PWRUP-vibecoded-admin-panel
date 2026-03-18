@@ -42,6 +42,7 @@ export function DockDrawer({
                 key={item.id}
                 id={item.id}
                 symbol={item.symbol}
+                activeSymbol={item.activeSymbol}
                 isActive={item.id === activeTabId}
                 onTap={() => onOpen(item.id)}
               />
