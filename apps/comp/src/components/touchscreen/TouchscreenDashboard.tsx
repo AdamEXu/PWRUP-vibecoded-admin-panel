@@ -5,7 +5,12 @@ import { useCallback, useState } from "react";
 import { ConnectionLost } from "../match/ConnectionLost";
 import { LeftRail } from "./components/chrome/LeftRail";
 import { RightPanel } from "./components/chrome/RightPanel";
-import { PlaceholderScreen } from "./components/common/PlaceholderScreen";
+import dynamic from "next/dynamic";
+
+const DriverTab = dynamic(
+  () => import("./tabs/DriverTab").then((m) => m.DriverTab),
+  { ssr: false, loading: () => <div className="h-full w-full bg-black" /> },
+);
 import { TouchscreenDragGhost } from "./components/dnd/TouchscreenDragGhost";
 import { DockDrawer } from "./components/dock/DockDrawer";
 import { useTouchscreenDnd } from "./hooks/useTouchscreenDnd";
@@ -78,7 +83,7 @@ export function TouchscreenDashboard() {
       onDragEnd={handleDragEnd}
     >
       <div className="fixed top-0 bottom-0 z-0 bg-black" style={driverLayerStyle}>
-        <PlaceholderScreen title="Driver tab" />
+        <DriverTab />
       </div>
 
       {prevOverlayTab !== null && (
