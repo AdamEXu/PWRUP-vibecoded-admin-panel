@@ -8,6 +8,7 @@
   "joints": {
     "elevator_inner": {
       "nodeName": "InnerStage <1>",
+      "ntTopic": "/AdvantageKit/RealOutputs/Elevator/CurrentPosition",
       "type": "prismatic",
       "axis": [0, 1, 0],
       "limits": { "min": 0, "max": 1.2 },
@@ -71,7 +72,6 @@
       "axis": [0, 0, 1],
       "limits": { "min": -1.5, "max": 1.5 },
       "defaultValue": 0,
-      "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentPosition",
       "description": "Climber inner stage",
       "debugSlider": { "label": "Climber Inner", "step": 0.01 }
     },
@@ -81,9 +81,8 @@
       "axis": [0, 0, 1],
       "limits": { "min": -1.5, "max": 1.5 },
       "defaultValue": 0,
-      "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentPosition",
-      "description": "Climber outer stage",
-      "debugSlider": { "label": "Climber Outer", "step": 0.01 }
+      "description": "Climber outer stage mirrors the inner stage in the opposite direction",
+      "link": { "source": "climber_inner", "scale": -1, "offset": 0 }
     },
     "index_wrist": {
       "nodeName": "IndexWristRControl",
