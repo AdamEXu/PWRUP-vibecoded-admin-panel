@@ -12,11 +12,13 @@ import React, {
 import {
   DEFAULTS,
   DEFAULT_HUD_VISIBILITY,
+  DEFAULT_MAP_SETTINGS,
   frcTeamToRobotIp,
   ntPathFromTableAndEntry,
   ntSelectedPathTopics,
   type ConnectionSettings,
   type HudVisibilitySettings,
+  type MapSettings,
   type SharedSettingsPayload,
 } from "./settings-schema";
 
@@ -28,6 +30,9 @@ interface SettingsContextValue {
   setHudVisibility: (next: HudVisibilitySettings) => void;
   updateHudVisibility: (patch: Partial<HudVisibilitySettings>) => void;
   resetHudVisibility: () => void;
+  mapSettings: MapSettings;
+  updateMapSettings: (patch: Partial<MapSettings>) => void;
+  resetMapSettings: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
@@ -136,7 +141,8 @@ function normalizeSettings(parsed: Partial<ConnectionSettings>): ConnectionSetti
 
 function normalizeHudVisibility(parsed: Partial<HudVisibilitySettings> | undefined): HudVisibilitySettings {
   return {
-    showMap: false,
+    showMap:
+      typeof parsed?.showMap === "boolean" ? parsed.showMap : DEFAULT_HUD_VISIBILITY.showMap,
     showTimers:
       typeof parsed?.showTimers === "boolean" ? parsed.showTimers : DEFAULT_HUD_VISIBILITY.showTimers,
     showStatus:
@@ -146,12 +152,28 @@ function normalizeHudVisibility(parsed: Partial<HudVisibilitySettings> | undefin
   };
 }
 
+function normalizeMapSettings(parsed: Partial<MapSettings> | undefined): MapSettings {
+  return {
+    mode: parsed?.mode === 'follow' || parsed?.mode === 'driver' ? parsed.mode : DEFAULT_MAP_SETTINGS.mode,
+    angle:
+      typeof parsed?.angle === "number" && Number.isFinite(parsed.angle)
+        ? Math.max(0, Math.min(1, parsed.angle))
+        : DEFAULT_MAP_SETTINGS.angle,
+    zoom:
+      typeof parsed?.zoom === "number" && Number.isFinite(parsed.zoom)
+        ? Math.max(0, Math.min(1, parsed.zoom))
+        : DEFAULT_MAP_SETTINGS.zoom,
+  };
+}
+
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettingsState] = useState<ConnectionSettings>(DEFAULTS);
   const [hudVisibility, setHudVisibilityState] =
     useState<HudVisibilitySettings>(DEFAULT_HUD_VISIBILITY);
+  const [mapSettings, setMapSettingsState] = useState<MapSettings>(DEFAULT_MAP_SETTINGS);
   const versionRef = useRef(0);
   const hudVisibilityRef = useRef<HudVisibilitySettings>(DEFAULT_HUD_VISIBILITY);
+  const mapSettingsRef = useRef<MapSettings>(DEFAULT_MAP_SETTINGS);
 
   const applyPayload = useCallback((payload: SharedSettingsPayload) => {
     versionRef.current = payload.version;
@@ -159,6 +181,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const nextHudVisibility = normalizeHudVisibility(payload.hudVisibility);
     hudVisibilityRef.current = nextHudVisibility;
     setHudVisibilityState(nextHudVisibility);
+    const nextMapSettings = normalizeMapSettings(payload.mapSettings);
+    mapSettingsRef.current = nextMapSettings;
+    setMapSettingsState(nextMapSettings);
   }, []);
 
   const fetchSharedSettings = useCallback(async () => {
@@ -174,6 +199,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     async (next: {
       settings?: ConnectionSettings;
       hudVisibility?: HudVisibilitySettings;
+      mapSettings?: MapSettings;
     }) => {
       const response = await fetch("/api/settings/connection", {
         method: "PUT",
@@ -264,6 +290,29 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setHudVisibility(DEFAULT_HUD_VISIBILITY);
   }, [setHudVisibility]);
 
+  const setMapSettings = useCallback(
+    (next: MapSettings) => {
+      const normalized = normalizeMapSettings(next);
+      mapSettingsRef.current = normalized;
+      setMapSettingsState(normalized);
+      void persistSharedState({ mapSettings: normalized }).catch(() => {
+        void fetchSharedSettings().catch(() => {});
+      });
+    },
+    [fetchSharedSettings, persistSharedState],
+  );
+
+  const updateMapSettings = useCallback(
+    (patch: Partial<MapSettings>) => {
+      setMapSettings({ ...mapSettingsRef.current, ...patch });
+    },
+    [setMapSettings],
+  );
+
+  const resetMapSettings = useCallback(() => {
+    setMapSettings(DEFAULT_MAP_SETTINGS);
+  }, [setMapSettings]);
+
   const value = useMemo<SettingsContextValue>(
     () => ({
       settings,
@@ -273,15 +322,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setHudVisibility,
       updateHudVisibility,
       resetHudVisibility,
+      mapSettings,
+      updateMapSettings,
+      resetMapSettings,
     }),
     [
       hudVisibility,
+      mapSettings,
       resetDefaults,
       resetHudVisibility,
+      resetMapSettings,
       setHudVisibility,
       setSettings,
       settings,
       updateHudVisibility,
+      updateMapSettings,
     ],
   );
 
@@ -299,10 +354,12 @@ export function useSettings(): SettingsContextValue {
 export {
   DEFAULTS,
   DEFAULT_HUD_VISIBILITY,
+  DEFAULT_MAP_SETTINGS,
   frcTeamToRobotIp,
   ntPathFromTableAndEntry,
   ntSelectedPathTopics,
   type ConnectionSettings,
   type HudVisibilitySettings,
+  type MapSettings,
   type SharedSettingsPayload,
 };

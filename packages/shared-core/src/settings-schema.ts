@@ -18,11 +18,18 @@ export interface HudVisibilitySettings {
   showCamera: boolean;
 }
 
+export interface MapSettings {
+  mode: 'follow' | 'driver';
+  angle: number; // 0–1, 0 = top-down, 1 = level with robot
+  zoom: number;  // 0–1, 0 = far, 1 = close
+}
+
 export interface SharedSettingsPayload {
   version: number;
   updatedAtIso: string;
   settings: ConnectionSettings;
   hudVisibility: HudVisibilitySettings;
+  mapSettings?: MapSettings;
 }
 
 export const DEFAULTS: ConnectionSettings = {
@@ -37,10 +44,16 @@ export const DEFAULTS: ConnectionSettings = {
 };
 
 export const DEFAULT_HUD_VISIBILITY: HudVisibilitySettings = {
-  showMap: false,
+  showMap: true,
   showTimers: true,
   showStatus: true,
   showCamera: true,
+};
+
+export const DEFAULT_MAP_SETTINGS: MapSettings = {
+  mode: 'follow',
+  angle: 0.3,
+  zoom: 0.5,
 };
 
 export function frcTeamToRobotIp(teamNumber: number, lastOctet = 2): string {

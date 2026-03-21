@@ -4,9 +4,10 @@ import { promises as fs } from "fs";
 import type {
   ConnectionSettings,
   HudVisibilitySettings,
+  MapSettings,
   SharedSettingsPayload,
 } from "./settings-schema";
-import { DEFAULTS, DEFAULT_HUD_VISIBILITY } from "./settings-schema";
+import { DEFAULTS, DEFAULT_HUD_VISIBILITY, DEFAULT_MAP_SETTINGS } from "./settings-schema";
 
 function getSharedSettingsPath(): string {
   const fromEnv = process.env.PWRUP_SHARED_SETTINGS_PATH?.trim();
@@ -59,7 +60,8 @@ function normalizeSettings(next: Partial<ConnectionSettings>): ConnectionSetting
 
 function normalizeHudVisibility(next: Partial<HudVisibilitySettings> | undefined): HudVisibilitySettings {
   return {
-    showMap: false,
+    showMap:
+      typeof next?.showMap === "boolean" ? next.showMap : DEFAULT_HUD_VISIBILITY.showMap,
     showTimers:
       typeof next?.showTimers === "boolean"
         ? next.showTimers
@@ -75,10 +77,25 @@ function normalizeHudVisibility(next: Partial<HudVisibilitySettings> | undefined
   };
 }
 
+function normalizeMapSettings(next: Partial<MapSettings> | undefined): MapSettings {
+  return {
+    mode: next?.mode === 'follow' || next?.mode === 'driver' ? next.mode : DEFAULT_MAP_SETTINGS.mode,
+    angle:
+      typeof next?.angle === "number" && Number.isFinite(next.angle)
+        ? Math.max(0, Math.min(1, next.angle))
+        : DEFAULT_MAP_SETTINGS.angle,
+    zoom:
+      typeof next?.zoom === "number" && Number.isFinite(next.zoom)
+        ? Math.max(0, Math.min(1, next.zoom))
+        : DEFAULT_MAP_SETTINGS.zoom,
+  };
+}
+
 function normalizePayload(raw: unknown): SharedSettingsPayload {
   const parsed = raw as Partial<SharedSettingsPayload> | undefined;
   const normalizedSettings = normalizeSettings(parsed?.settings ?? DEFAULTS);
   const normalizedHudVisibility = normalizeHudVisibility(parsed?.hudVisibility);
+  const normalizedMapSettings = normalizeMapSettings(parsed?.mapSettings);
 
   const version =
     typeof parsed?.version === "number" && Number.isFinite(parsed.version) && parsed.version >= 1
@@ -95,6 +112,7 @@ function normalizePayload(raw: unknown): SharedSettingsPayload {
     updatedAtIso,
     settings: normalizedSettings,
     hudVisibility: normalizedHudVisibility,
+    mapSettings: normalizedMapSettings,
   };
 }
 
@@ -133,6 +151,7 @@ export async function readSharedSettings(): Promise<SharedSettingsPayload> {
 export async function updateSharedSettings(next: {
   settings?: ConnectionSettings;
   hudVisibility?: HudVisibilitySettings;
+  mapSettings?: MapSettings;
 }): Promise<SharedSettingsPayload> {
   const current = await readSharedSettings();
   const updated: SharedSettingsPayload = {
@@ -140,6 +159,7 @@ export async function updateSharedSettings(next: {
     updatedAtIso: new Date().toISOString(),
     settings: normalizeSettings(next.settings ?? current.settings),
     hudVisibility: normalizeHudVisibility(next.hudVisibility ?? current.hudVisibility),
+    mapSettings: normalizeMapSettings(next.mapSettings ?? current.mapSettings),
   };
 
   await writeAtomically(getSharedSettingsPath(), updated);

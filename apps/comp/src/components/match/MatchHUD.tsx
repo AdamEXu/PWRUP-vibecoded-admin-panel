@@ -2,16 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useSettings } from "@/lib/settings";
 import { hasBridge, subscribeLaneToastPreview } from "@/lib/blitzRenderer";
 import { useLaneAlignmentSignal } from "@/lib/match/useLaneAlignmentSignal";
 import { useMatchState } from "@/lib/match/useMatchState";
 import { useMockMatchState } from "@/lib/match/useMockMatchState";
+import {
+  readDebugPose,
+  subscribeDebugPose,
+  type DebugPoseOverride,
+} from "@/lib/debug/debugPoseOverride";
+import dynamic from "next/dynamic";
 import { HeaderBar } from "./HeaderBar";
 import { ShiftIndicator } from "./ShiftIndicator";
-import { MiniMap } from "./MiniMap";
 import { CameraOverlay } from "./CameraOverlay";
 import { ConnectionLost } from "./ConnectionLost";
+
+const MiniMap3D = dynamic(
+  () => import("./MiniMap3D").then((m) => ({ default: m.MiniMap3D })),
+  { ssr: false, loading: () => null },
+);
 
 const LANE_ALIGNMENT_TOAST_ID = "lane-alignment-status";
 const LANE_ALIGNMENT_SYMBOL = "􀨕";
@@ -61,10 +70,28 @@ export function MatchHUD() {
   const hasSeenLaneAlignmentValueRef = useRef(false);
   const lastLaneAlignmentValueRef = useRef<boolean | null>(null);
 
-  const { hudVisibility } = useSettings();
+  const [debugPose, setDebugPose] = useState<DebugPoseOverride | null>(() => readDebugPose());
+
+  // Listen for debug pose overrides from the debug dashboard
+  useEffect(() => {
+    return subscribeDebugPose(setDebugPose);
+  }, []);
+
   const realState = useMatchState();
   const mockState = useMockMatchState();
-  const state = isMock ? mockState : realState;
+  const baseState = isMock ? mockState : realState;
+
+  // Apply debug pose overrides on top of the base state
+  const state = debugPose
+    ? {
+        ...baseState,
+        robotPoseX: debugPose.poseX,
+        robotPoseY: debugPose.poseY,
+        robotHeading: debugPose.heading,
+        isRedAlliance: debugPose.isRedAlliance,
+        isConnected: true,
+      }
+    : baseState;
 
   // Reset lane alignment tracking when a new match starts so toasts fire correctly
   useEffect(() => {
@@ -136,49 +163,38 @@ export function MatchHUD() {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {/* Header bar — colored strip + centered timer */}
-      {hudVisibility.showTimers && (
-        <HeaderBar
-          headerColor={state.headerColor}
-          fmsMatchTime={state.fmsMatchTime}
-          totalTimeRemaining={state.totalTimeRemaining}
-        />
-      )}
+      <HeaderBar
+        headerColor={state.headerColor}
+        fmsMatchTime={state.fmsMatchTime}
+        totalTimeRemaining={state.totalTimeRemaining}
+      />
 
-      {/* Shift indicator — centered at ~31% down */}
-      {hudVisibility.showStatus && (
-        <ShiftIndicator
-          hubStatus={state.hubStatus}
-          aimMode={state.aimMode}
-          matchPhase={state.matchPhase}
-          periodTimeRemaining={state.fmsMatchTime}
-          shiftTimeRemaining={state.shiftTimeRemaining}
-          shiftTimeWithBuffer={state.shiftTimeWithBuffer}
-          bufferRemaining={state.bufferRemaining}
-          showBuffer={state.showBuffer}
-          showShiftIndicator={state.showShiftIndicator}
-        />
-      )}
+      <ShiftIndicator
+        hubStatus={state.hubStatus}
+        aimMode={state.aimMode}
+        matchPhase={state.matchPhase}
+        periodTimeRemaining={state.fmsMatchTime}
+        shiftTimeRemaining={state.shiftTimeRemaining}
+        shiftTimeWithBuffer={state.shiftTimeWithBuffer}
+        bufferRemaining={state.bufferRemaining}
+        showBuffer={state.showBuffer}
+        showShiftIndicator={state.showShiftIndicator}
+      />
 
-      {/* Minimap — centered, 28.125% from left, fills to bottom */}
-      {hudVisibility.showMap && (
-        <MiniMap
-          poseX={state.robotPoseX}
-          poseY={state.robotPoseY}
-          heading={state.robotHeading}
-          isRedAlliance={state.isRedAlliance}
-        />
-      )}
+      <MiniMap3D
+        poseX={state.robotPoseX}
+        poseY={state.robotPoseY}
+        heading={state.robotHeading}
+        isRedAlliance={state.isRedAlliance}
+        matchPhase={state.matchPhase}
+      />
 
-      {/* Camera overlay — top-right, only when auto-aligning */}
-      {hudVisibility.showCamera && (
-        <CameraOverlay
-          active={state.autoAlignActive}
-          distanceToTarget={state.autoAlignDistance}
-          isReady={state.autoAlignReady}
-          cameraTopic={state.cameraTopic}
-        />
-      )}
+      <CameraOverlay
+        active={state.autoAlignActive}
+        distanceToTarget={state.autoAlignDistance}
+        isReady={state.autoAlignReady}
+        cameraTopic={state.cameraTopic}
+      />
 
       <ConnectionLost visible={!state.isConnected} />
     </div>

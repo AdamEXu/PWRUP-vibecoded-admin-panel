@@ -7,6 +7,8 @@ import {
   type NtDebugTopicValue,
 } from "@/lib/debug/ntTopicCatalog";
 import { useDeveloperDebugDashboard } from "@/lib/debug/useDeveloperDebugDashboard";
+import { writeDebugPose, clearDebugPose as clearDebugPoseOverride } from "@/lib/debug/debugPoseOverride";
+import { FieldPositionControl, type FieldPreset } from "./FieldPositionControl";
 
 const Robot3DTab = dynamic(
   () => import("@/components/touchscreen/tabs/Robot3DTab").then((m) => m.Robot3DTab),
@@ -156,6 +158,53 @@ export function DeveloperDebugDashboard() {
     setMainWindowMockScenario,
   } = useDeveloperDebugDashboard();
 
+  // Extract current effective pose values for the field control
+  const getEffective = (id: string): NtDebugTopicValue => {
+    const row = rows.find((r) => r.descriptor.id === id);
+    return row ? row.effectiveValue : 0;
+  };
+  const currentPoseX = Number(getEffective("matchHud.robotPoseX")) || 0;
+  const currentPoseY = Number(getEffective("matchHud.robotPoseY")) || 0;
+  const currentHeading = Number(getEffective("matchHud.robotHeading")) || 0;
+  const currentIsRed = Boolean(getEffective("matchHud.isRedAlliance"));
+
+  // Broadcast debug pose to HUD window + update local overrides
+  const broadcastPose = (patch: Partial<{
+    poseX: number; poseY: number; heading: number;
+    isRedAlliance: boolean; phase: number; enabled: boolean;
+  }>) => {
+    const poseX = patch.poseX ?? currentPoseX;
+    const poseY = patch.poseY ?? currentPoseY;
+    const heading = patch.heading ?? currentHeading;
+    const isRedAlliance = patch.isRedAlliance ?? currentIsRed;
+    const phase = patch.phase ?? (Number(getEffective("matchHud.phase")) || 0);
+    const enabled = patch.enabled ?? true;
+
+    writeDebugPose({ poseX, poseY, heading, isRedAlliance, phase, enabled, seq: 1, active: true });
+
+    // Also update local overrides for the debug table display
+    setOverride("matchHud.robotPoseX", poseX);
+    setOverride("matchHud.robotPoseY", poseY);
+    setOverride("matchHud.robotHeading", Math.round(heading * 1000) / 1000);
+    setOverride("matchHud.isRedAlliance", isRedAlliance);
+    setOverride("matchHud.phase", phase);
+    setOverride("matchHud.enabled", enabled);
+    setOverride("matchHud.seq", 1);
+    setOverride("matchHud.connected", true);
+  };
+
+  const handlePoseChange = (x: number, y: number) => broadcastPose({ poseX: x, poseY: y });
+  const handleHeadingChange = (h: number) => broadcastPose({ heading: h });
+  const handleAllianceChange = (isRed: boolean) => broadcastPose({ isRedAlliance: isRed });
+  const handleFieldPreset = (preset: FieldPreset) => broadcastPose({
+    poseX: preset.poseX,
+    poseY: preset.poseY,
+    heading: preset.heading,
+    isRedAlliance: preset.isRedAlliance,
+    phase: preset.phase,
+    enabled: preset.enabled,
+  });
+
   return (
     <main className="h-screen overflow-y-auto bg-[#0e1014] text-zinc-100">
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-4 p-4">
@@ -176,6 +225,19 @@ export function DeveloperDebugDashboard() {
           <div className="h-[calc(100%-33px)]">
             <Robot3DTab />
           </div>
+        </section>
+
+        <section className="rounded border border-zinc-800 bg-zinc-900/80 p-3">
+          <FieldPositionControl
+            poseX={currentPoseX}
+            poseY={currentPoseY}
+            heading={currentHeading}
+            isRedAlliance={currentIsRed}
+            onPoseChange={handlePoseChange}
+            onHeadingChange={handleHeadingChange}
+            onAllianceChange={handleAllianceChange}
+            onApplyPreset={handleFieldPreset}
+          />
         </section>
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr),minmax(320px,420px)]">
@@ -266,7 +328,7 @@ export function DeveloperDebugDashboard() {
             </div>
             <button
               type="button"
-              onClick={clearAllOverrides}
+              onClick={() => { clearAllOverrides(); clearDebugPoseOverride(); }}
               disabled={overrideCount === 0}
               className="h-8 rounded border border-zinc-600 px-3 text-xs text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
             >

@@ -12,14 +12,61 @@ import React, {
 import {
   DEFAULTS,
   DEFAULT_HUD_VISIBILITY,
+  DEFAULT_MAP_SETTINGS,
   frcTeamToRobotIp,
   ntPathFromTableAndEntry,
   ntSelectedPathTopics,
   type ConnectionSettings,
   type HudVisibilitySettings,
+  type MapSettings,
   type SharedSettingsPayload,
 } from "@pwrup/shared-core/settings";
 import { getBridge, hasBridge, subscribeSettings } from "./blitzRenderer";
+
+const MAP_SETTINGS_KEY = "pwrup-map-settings";
+
+function loadMapSettings(): MapSettings {
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem(MAP_SETTINGS_KEY) : null;
+    if (!raw) return DEFAULT_MAP_SETTINGS;
+    const parsed = JSON.parse(raw) as Partial<MapSettings>;
+    return {
+      mode: parsed.mode === "follow" || parsed.mode === "driver" ? parsed.mode : DEFAULT_MAP_SETTINGS.mode,
+      angle: typeof parsed.angle === "number" && isFinite(parsed.angle) ? Math.max(0, Math.min(1, parsed.angle)) : DEFAULT_MAP_SETTINGS.angle,
+      zoom: typeof parsed.zoom === "number" && isFinite(parsed.zoom) ? Math.max(0, Math.min(1, parsed.zoom)) : DEFAULT_MAP_SETTINGS.zoom,
+    };
+  } catch {
+    return DEFAULT_MAP_SETTINGS;
+  }
+}
+
+const MAP_SETTINGS_CHANNEL = "pwrup-map-settings-sync";
+
+function getMapSettingsChannel(): BroadcastChannel | null {
+  try {
+    return new BroadcastChannel(MAP_SETTINGS_CHANNEL);
+  } catch {
+    return null;
+  }
+}
+
+function saveMapSettings(s: MapSettings) {
+  try {
+    localStorage.setItem(MAP_SETTINGS_KEY, JSON.stringify(s));
+  } catch {
+    // Storage unavailable — ignore
+  }
+  // Broadcast to other windows (BroadcastChannel fires in ALL other same-origin contexts)
+  try {
+    const ch = getMapSettingsChannel();
+    if (ch) {
+      ch.postMessage(s);
+      ch.close();
+    }
+  } catch {
+    // Ignore
+  }
+}
 
 interface SettingsContextValue {
   settings: ConnectionSettings;
@@ -29,6 +76,9 @@ interface SettingsContextValue {
   setHudVisibility: (next: HudVisibilitySettings) => void;
   updateHudVisibility: (patch: Partial<HudVisibilitySettings>) => void;
   resetHudVisibility: () => void;
+  mapSettings: MapSettings;
+  updateMapSettings: (patch: Partial<MapSettings>) => void;
+  resetMapSettings: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
@@ -37,8 +87,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettingsState] = useState<ConnectionSettings>(DEFAULTS);
   const [hudVisibility, setHudVisibilityState] =
     useState<HudVisibilitySettings>(DEFAULT_HUD_VISIBILITY);
+  const [mapSettings, setMapSettingsState] = useState<MapSettings>(() => loadMapSettings());
   const versionRef = useRef(0);
   const hudVisibilityRef = useRef<HudVisibilitySettings>(DEFAULT_HUD_VISIBILITY);
+  const mapSettingsRef = useRef<MapSettings>(mapSettings);
 
   const applyPayload = useCallback((payload: SharedSettingsPayload) => {
     versionRef.current = payload.version;
@@ -160,6 +212,55 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       });
   }, [applyPayload]);
 
+  const updateMapSettings = useCallback((patch: Partial<MapSettings>) => {
+    const next: MapSettings = { ...mapSettingsRef.current, ...patch };
+    mapSettingsRef.current = next;
+    setMapSettingsState(next);
+    saveMapSettings(next);
+  }, []);
+
+  const resetMapSettings = useCallback(() => {
+    mapSettingsRef.current = DEFAULT_MAP_SETTINGS;
+    setMapSettingsState(DEFAULT_MAP_SETTINGS);
+    saveMapSettings(DEFAULT_MAP_SETTINGS);
+  }, []);
+
+  // Sync mapSettings across windows via BroadcastChannel + storage events
+  useEffect(() => {
+    const applyRemote = (data: unknown) => {
+      const parsed = data as Partial<MapSettings> | null;
+      const next: MapSettings = {
+        mode: parsed?.mode === "follow" || parsed?.mode === "driver" ? parsed.mode : mapSettingsRef.current.mode,
+        angle: typeof parsed?.angle === "number" && isFinite(parsed.angle) ? Math.max(0, Math.min(1, parsed.angle)) : mapSettingsRef.current.angle,
+        zoom: typeof parsed?.zoom === "number" && isFinite(parsed.zoom) ? Math.max(0, Math.min(1, parsed.zoom)) : mapSettingsRef.current.zoom,
+      };
+      mapSettingsRef.current = next;
+      setMapSettingsState(next);
+    };
+
+    // BroadcastChannel — fires in other same-origin windows (works in Electron)
+    const ch = getMapSettingsChannel();
+    if (ch) {
+      ch.onmessage = (e: MessageEvent) => applyRemote(e.data);
+    }
+
+    // Storage event — fallback for contexts where BroadcastChannel isn't available
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== MAP_SETTINGS_KEY || !e.newValue) return;
+      try {
+        applyRemote(JSON.parse(e.newValue));
+      } catch {
+        // Ignore parse errors
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      ch?.close();
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
   const value = useMemo<SettingsContextValue>(
     () => ({
       settings,
@@ -169,15 +270,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setHudVisibility,
       updateHudVisibility,
       resetHudVisibility,
+      mapSettings,
+      updateMapSettings,
+      resetMapSettings,
     }),
     [
       hudVisibility,
+      mapSettings,
       resetDefaults,
       resetHudVisibility,
+      resetMapSettings,
       setHudVisibility,
       setSettings,
       settings,
       updateHudVisibility,
+      updateMapSettings,
     ],
   );
 
@@ -195,10 +302,12 @@ export function useSettings(): SettingsContextValue {
 export {
   DEFAULTS,
   DEFAULT_HUD_VISIBILITY,
+  DEFAULT_MAP_SETTINGS,
   frcTeamToRobotIp,
   ntPathFromTableAndEntry,
   ntSelectedPathTopics,
   type ConnectionSettings,
   type HudVisibilitySettings,
+  type MapSettings,
   type SharedSettingsPayload,
 };
