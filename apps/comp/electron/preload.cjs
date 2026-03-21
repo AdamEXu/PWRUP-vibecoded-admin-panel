@@ -7,8 +7,6 @@ const ntCallbacks = new Map();
 const autobahnCallbacks = new Map();
 const autobahnStatusCallbacks = new Map();
 let nextAutobahnStatusCallbackId = 1;
-const debugLaneToastPreviewCallbacks = new Map();
-let nextDebugLaneToastPreviewCallbackId = 1;
 
 ipcRenderer.on("blitz:settings:update", (_event, snapshot) => {
   settingsCallbacks.forEach((callback) => {
@@ -41,12 +39,6 @@ ipcRenderer.on("blitz:autobahn:update", (_event, update) => {
 ipcRenderer.on("blitz:autobahn:status", (_event, isConnected) => {
   autobahnStatusCallbacks.forEach((callback) => {
     callback(isConnected);
-  });
-});
-
-ipcRenderer.on("blitz:debug:lane-toast-preview", (_event, enabled) => {
-  debugLaneToastPreviewCallbacks.forEach((callback) => {
-    callback(enabled);
   });
 });
 
@@ -109,17 +101,5 @@ contextBridge.exposeInMainWorld("blitzRenderer", {
       await ipcRenderer.invoke("blitz:autobahn:unsubscribe", subscriptionId);
     },
     publish: (params) => ipcRenderer.invoke("blitz:autobahn:publish", params),
-  },
-  debug: {
-    subscribeLaneToastPreview: (callback) => {
-      const callbackId = nextDebugLaneToastPreviewCallbackId++;
-      debugLaneToastPreviewCallbacks.set(callbackId, callback);
-      return callbackId;
-    },
-    unsubscribeLaneToastPreview: (callbackId) => {
-      debugLaneToastPreviewCallbacks.delete(callbackId);
-    },
-    getMainWindowMock: () => ipcRenderer.invoke("blitz:debug:get-main-window-mock"),
-    setMainWindowMock: (scenario) => ipcRenderer.invoke("blitz:debug:set-main-window-mock", scenario),
   },
 });

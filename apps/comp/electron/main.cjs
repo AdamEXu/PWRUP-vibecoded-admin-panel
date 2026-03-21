@@ -12,15 +12,11 @@ const DEFAULT_DEV_URL = "http://127.0.0.1:3001";
 const SERVER_START_TIMEOUT_MS = 60_000;
 const SERVER_POLL_INTERVAL_MS = 300;
 const TILE_SHORTCUT_KEY = "f";
-const PREVIEW_TOAST_SHORTCUT_KEY = "n";
-const DEVELOPER_DEBUG_SHORTCUT_KEY = "d";
-const MAIN_WINDOW_ROUTE = "/";
 const MAIN_HUD_DISPLAY_SIZE = { width: 1920, height: 1080 };
 const TOUCHSCREEN_DISPLAY_SIZE = { width: 1920, height: 515 };
 
 let mainWindow = null;
 let touchscreenWindow = null;
-let debugWindow = null;
 let nextServerProcess = null;
 let packagedServerUrl = null;
 let bundledServerScriptPath = null;
@@ -251,11 +247,6 @@ function registerIpcHandlers() {
     autobahnBroker.unsubscribe(subscriptionId);
   });
   ipcMain.handle("blitz:autobahn:publish", (_event, params) => autobahnBroker.publish(params));
-
-  ipcMain.handle("blitz:debug:get-main-window-mock", () => getMainWindowMockState());
-  ipcMain.handle("blitz:debug:set-main-window-mock", async (_event, scenario) =>
-    setMainWindowMockState(scenario),
-  );
 }
 
 async function initializeBridge() {
@@ -282,37 +273,6 @@ function isShortcutInput(input) {
     input.shift &&
     (input.control || input.meta) &&
     String(input.key || "").toLowerCase() === TILE_SHORTCUT_KEY
-  );
-}
-
-function isPreviewToastShortcutInput(input) {
-  const key = String(input.key || "").toLowerCase();
-  const code = String(input.code || "");
-  const isDeadKeyFallback = key === "dead" && (!code || code === "KeyN");
-  return (
-    input.type === "keyDown" &&
-    input.alt &&
-    !input.control &&
-    !input.meta &&
-    (code === "KeyN" || key === PREVIEW_TOAST_SHORTCUT_KEY || isDeadKeyFallback)
-  );
-}
-
-function getPreviewToastEnabledFromShortcut(input) {
-  return !input.shift;
-}
-
-function isDeveloperDebugShortcutInput(input) {
-  const key = String(input.key || "").toLowerCase();
-  const code = String(input.code || "");
-  const isDeadKeyFallback = key === "dead" && (!code || code === "KeyD");
-
-  return (
-    input.type === "keyDown" &&
-    input.alt &&
-    !input.control &&
-    !input.meta &&
-    (code === "KeyD" || key === DEVELOPER_DEBUG_SHORTCUT_KEY || isDeadKeyFallback)
   );
 }
 
@@ -362,109 +322,8 @@ function tileCompWindows() {
   tileWindowToDisplay(touchscreenWindow, touchscreenDisplay);
 }
 
-async function openOrFocusDebugWindow() {
-  if (debugWindow && !debugWindow.isDestroyed()) {
-    if (debugWindow.isMinimized()) {
-      debugWindow.restore();
-    }
-    debugWindow.show();
-    debugWindow.focus();
-    return debugWindow;
-  }
-
-  debugWindow = await createAppWindow({
-    routePath: "/debug",
-    width: 1440,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 720,
-    title: "PWRUP Developer Debug Dashboard",
-    assignWindow: (window) => {
-      debugWindow = window;
-    },
-  });
-
-  return debugWindow;
-}
-
-function getMainWindowMockState() {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    return {
-      enabled: false,
-      scenario: null,
-      url: null,
-    };
-  }
-
-  const url = mainWindow.webContents.getURL() || null;
-  if (!url) {
-    return {
-      enabled: false,
-      scenario: null,
-      url: null,
-    };
-  }
-
-  try {
-    const parsed = new URL(url);
-    const scenario = parsed.searchParams.get("mock");
-    return {
-      enabled: !!(scenario && scenario.trim()),
-      scenario: scenario && scenario.trim() ? scenario.trim() : null,
-      url,
-    };
-  } catch {
-    return {
-      enabled: false,
-      scenario: null,
-      url,
-    };
-  }
-}
-
-async function setMainWindowMockState(rawScenario) {
-  const scenario =
-    typeof rawScenario === "string" && rawScenario.trim().length > 0
-      ? rawScenario.trim()
-      : null;
-
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    await createWindows();
-  }
-
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    throw new Error("Main HUD window is not available.");
-  }
-
-  const startUrl = await getRendererStartUrl();
-  const nextUrl = new URL(MAIN_WINDOW_ROUTE, startUrl);
-  if (scenario) {
-    nextUrl.searchParams.set("mock", scenario);
-  }
-
-  await mainWindow.loadURL(nextUrl.toString());
-  return getMainWindowMockState();
-}
-
 function attachTilingShortcut(window) {
   window.webContents.on("before-input-event", (event, input) => {
-    if (isPreviewToastShortcutInput(input)) {
-      event.preventDefault();
-      window.webContents.send(
-        "blitz:debug:lane-toast-preview",
-        getPreviewToastEnabledFromShortcut(input),
-      );
-      return;
-    }
-
-    if (isDeveloperDebugShortcutInput(input)) {
-      event.preventDefault();
-      void openOrFocusDebugWindow().catch((error) => {
-        console.error("Failed to open debug window:", error);
-      });
-      return;
-    }
-
     if (!isShortcutInput(input)) {
       return;
     }

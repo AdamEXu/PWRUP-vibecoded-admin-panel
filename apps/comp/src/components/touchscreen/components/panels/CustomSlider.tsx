@@ -96,12 +96,12 @@ export function CustomSlider({ value, onChange, label }: CustomSliderProps) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="relative h-[48px] cursor-pointer select-none overflow-hidden"
+        className="relative h-[48px] cursor-pointer select-none overflow-hidden transition-colors duration-100"
         style={{ border: `4px solid ${borderColor}`, backgroundColor: "#272727" }}
       >
         {/* Fill bar */}
         <div
-          className="absolute inset-y-0 left-0 transition-colors duration-150"
+          className="absolute inset-y-0 left-0 transition-colors duration-100"
           style={{
             width: `${value * 100}%`,
             backgroundColor: fillColor,

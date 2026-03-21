@@ -1,16 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { hasBridge, subscribeLaneToastPreview } from "@/lib/blitzRenderer";
 import { useLaneAlignmentSignal } from "@/lib/match/useLaneAlignmentSignal";
 import { useMatchState } from "@/lib/match/useMatchState";
-import { useMockMatchState } from "@/lib/match/useMockMatchState";
-import {
-  readDebugPose,
-  subscribeDebugPose,
-  type DebugPoseOverride,
-} from "@/lib/debug/debugPoseOverride";
 import dynamic from "next/dynamic";
 import { HeaderBar } from "./HeaderBar";
 import { ShiftIndicator } from "./ShiftIndicator";
@@ -25,16 +18,7 @@ const MiniMap3D = dynamic(
 const LANE_ALIGNMENT_TOAST_ID = "lane-alignment-status";
 const LANE_ALIGNMENT_SYMBOL = "􀨕";
 
-function showLaneAlignmentToast(
-  enabled: boolean,
-  options?: {
-    preview?: boolean;
-    dedupe?: boolean;
-  },
-) {
-  const preview = options?.preview ?? false;
-  const dedupe = options?.dedupe ?? true;
-
+function showLaneAlignmentToast(enabled: boolean) {
   const showToast = enabled ? toast.success : toast.error;
 
   showToast(
@@ -42,11 +26,10 @@ function showLaneAlignmentToast(
       <span className="sf-symbol text-[1.05rem] leading-none">{LANE_ALIGNMENT_SYMBOL}</span>
       <span className="font-medium">
         Lane Alignment {enabled ? "ON" : "OFF"}
-        {preview ? " (Preview)" : ""}
       </span>
     </span>,
     {
-      ...(dedupe ? { id: LANE_ALIGNMENT_TOAST_ID } : {}),
+      id: LANE_ALIGNMENT_TOAST_ID,
       duration: 1800,
       className: "!bg-[#0a0a0a] !border-[#2a2a2a] !shadow-lg",
     },
@@ -63,35 +46,11 @@ function showLaneAlignmentToast(
  *     Right (30vw)       — CameraOverlay (only when auto-aligning)
  */
 export function MatchHUD() {
-  const [isMock] = useState(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("mock")
-  );
   const laneAlignmentSignal = useLaneAlignmentSignal();
   const hasSeenLaneAlignmentValueRef = useRef(false);
   const lastLaneAlignmentValueRef = useRef<boolean | null>(null);
 
-  const [debugPose, setDebugPose] = useState<DebugPoseOverride | null>(() => readDebugPose());
-
-  // Listen for debug pose overrides from the debug dashboard
-  useEffect(() => {
-    return subscribeDebugPose(setDebugPose);
-  }, []);
-
-  const realState = useMatchState();
-  const mockState = useMockMatchState();
-  const baseState = isMock ? mockState : realState;
-
-  // Apply debug pose overrides on top of the base state
-  const state = debugPose
-    ? {
-        ...baseState,
-        robotPoseX: debugPose.poseX,
-        robotPoseY: debugPose.poseY,
-        robotHeading: debugPose.heading,
-        isRedAlliance: debugPose.isRedAlliance,
-        isConnected: true,
-      }
-    : baseState;
+  const state = useMatchState();
 
   // Reset lane alignment tracking when a new match starts so toasts fire correctly
   useEffect(() => {
@@ -125,41 +84,6 @@ export function MatchHUD() {
     laneAlignmentSignal.updatedAt,
     laneAlignmentSignal.value,
   ]);
-
-  useEffect(() => {
-    if (!hasBridge()) {
-      return;
-    }
-
-    return subscribeLaneToastPreview((enabled) => {
-      const previewValue = Boolean(enabled);
-      showLaneAlignmentToast(previewValue, { preview: true, dedupe: false });
-    });
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase();
-      const isOptionOrAltN = event.altKey && (
-        event.code === "KeyN"
-        || key === "n"
-        || key === "dead"
-      );
-
-      if (event.repeat || !isOptionOrAltN) {
-        return;
-      }
-
-      event.preventDefault();
-      const previewValue = !event.shiftKey;
-      showLaneAlignmentToast(previewValue, { preview: true, dedupe: false });
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, []);
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
