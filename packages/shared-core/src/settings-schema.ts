@@ -38,8 +38,8 @@ export const DEFAULTS: ConnectionSettings = {
   networkTables: {
     host: "10.47.65.2",
     port: 5810,
-    sharedTable: "PathPlanner",
-    selectedPathTopic: "SelectedPath",
+    sharedTable: "Shared",
+    selectedPathTopic: "PathPlanner/SelectedPath",
   },
 };
 
