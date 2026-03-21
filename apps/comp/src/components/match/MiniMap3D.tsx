@@ -9,6 +9,12 @@ import { useSettings } from "@/lib/settings";
 import { useRobotJoints } from "@/components/robot3d/useRobotJoints";
 import type { JointValue } from "@/components/robot3d/RobotViewer";
 import type { MatchPhase } from "@/lib/match/types";
+import fieldMeta from "../../../public/cad/field-meta.json";
+
+// ── Game piece node names to hide ───────────────────────────────────────────
+const GAME_PIECE_NODES = new Set(
+  fieldMeta.gamePieces.flatMap((gp) => gp.stagedObjects)
+);
 
 // ── Tuning constants ────────────────────────────────────────────────────────
 const DRACO_DECODER_PATH = "https://www.gstatic.com/draco/versioned/decoders/1.5.7/";
@@ -16,8 +22,10 @@ const FIELD_URL = "/cad/field-2026.glb?v=2";
 const ROBOT_URL = "/cad/Robot-Full.glb";
 
 // Camera distance range: zoom=0 → far, zoom=1 → close
-const ZOOM_NEAR = 3.5;
-const ZOOM_FAR = 14;
+const ZOOM_NEAR = 2;
+// At ZOOM_FAR, the 8.21m short axis fills ~80% of the viewport width
+// (FOV=50°, aspect≈1.4 → hFOV≈66° → width = 2*d*tan(33°) ≈ 1.3*d; 8.21/(0.8*1.3) ≈ 7.9)
+const ZOOM_FAR = 8.5;
 // Polar angle range: angle=0 → top-down, angle=1 → level
 const POLAR_TOP = 0.08;  // nearly top-down
 const POLAR_LOW = 1.35;  // nearly level
@@ -26,8 +34,7 @@ const LERP_POS = 0.08;   // robot position follow
 const LERP_THETA = 0.05; // follow-mode azimuth
 const LERP_CAM = 0.06;   // idle camera transition
 // Idle/showcase camera parameters
-const IDLE_DISTANCE = 6;
-const IDLE_POLAR = 0.7;  // ~40° elevation
+
 const IDLE_AZIMUTH_SPEED = 0.0; // static (no orbit in idle for now)
 const IDLE_THETA_OFFSET = Math.PI * 0.75; // offset so camera isn't directly behind
 
@@ -94,6 +101,9 @@ function useGLTFModel(url: string, useWrapper = false) {
         innerRef.current = gltf.scene;
         threeScene.add(wrapper);
       } else {
+        gltf.scene.traverse((obj) => {
+          if (GAME_PIECE_NODES.has(obj.name)) obj.visible = false;
+        });
         rootRef.current = gltf.scene;
         innerRef.current = gltf.scene;
         threeScene.add(gltf.scene);
@@ -148,8 +158,13 @@ function Scene({ poseX, poseY, heading, isRedAlliance, isIdle, joints }: ScenePr
   // Smooth camera azimuth theta
   const camThetaRef = useRef(0);
   // Current camera spherical
-  const camPhiRef = useRef(POLAR_TOP + mapSettings.angle * (POLAR_LOW - POLAR_TOP));
-  const camDistRef = useRef(ZOOM_FAR + (1 - mapSettings.zoom) * (ZOOM_NEAR - ZOOM_FAR));
+  // angle=0 → level/front (POLAR_LOW), angle=1 → top-down (POLAR_TOP)
+  const camPhiRef = useRef(POLAR_LOW - mapSettings.angle * (POLAR_LOW - POLAR_TOP));
+  // zoom=0 → far out (ZOOM_FAR), zoom=1 → close in (ZOOM_NEAR)
+  const camDistRef = useRef(ZOOM_FAR + mapSettings.zoom * (ZOOM_NEAR - ZOOM_FAR));
+  // Always-fresh ref so useFrame never has a stale mapSettings closure
+  const mapSettingsRef = useRef(mapSettings);
+  mapSettingsRef.current = mapSettings;
 
   useFrame(() => {
     const wrapper = robotRef.current;
@@ -184,25 +199,28 @@ function Scene({ poseX, poseY, heading, isRedAlliance, isIdle, joints }: ScenePr
     }
 
     // ── Camera target: lerp toward robot world position ───────────────
+    // At zoom=0 (max out), center on field short axis (Z=0) so full width is visible.
+    // At zoom=1 (max in), follow robot normally.
+    const zoomFactor = mapSettingsRef.current.zoom;
+    const targetZ = lerp(0, robotWorldZ, zoomFactor);
     camTargetRef.current.lerp(
-      new THREE.Vector3(robotWorldX, 0.3, robotWorldZ),
+      new THREE.Vector3(robotWorldX, 0.3, targetZ),
       LERP_POS,
     );
 
     // ── Desired camera parameters ─────────────────────────────────────
-    const targetPhi = POLAR_TOP + mapSettings.angle * (POLAR_LOW - POLAR_TOP);
-    const targetDist = ZOOM_FAR + (1 - mapSettings.zoom) * (ZOOM_NEAR - ZOOM_FAR);
+    const targetPhi = POLAR_LOW - mapSettingsRef.current.angle * (POLAR_LOW - POLAR_TOP);
+    const targetDist = ZOOM_FAR + mapSettingsRef.current.zoom * (ZOOM_NEAR - ZOOM_FAR);
+
+    camPhiRef.current = lerp(camPhiRef.current, targetPhi, 0.1);
+    camDistRef.current = lerp(camDistRef.current, targetDist, 0.1);
 
     let targetTheta: number;
 
     if (isIdle) {
-      // Showcase: fixed pleasant angle
+      // Showcase: fixed pleasant azimuth only; angle/zoom still follow sliders
       targetTheta = lerpAngle(camThetaRef.current, IDLE_THETA_OFFSET, LERP_CAM);
-      camPhiRef.current = lerp(camPhiRef.current, IDLE_POLAR, LERP_CAM);
-      camDistRef.current = lerp(camDistRef.current, IDLE_DISTANCE, LERP_CAM);
     } else {
-      camPhiRef.current = lerp(camPhiRef.current, targetPhi, 0.1);
-      camDistRef.current = lerp(camDistRef.current, targetDist, 0.1);
 
       if (mapSettings.mode === "follow") {
         // Camera is behind robot (climber side): robot heading points toward intake
@@ -235,11 +253,11 @@ function Scene({ poseX, poseY, heading, isRedAlliance, isIdle, joints }: ScenePr
 
   return (
     <>
-      <ambientLight intensity={1.5} />
-      <hemisphereLight args={[0xffffff, 0x444444, 1.0]} />
-      <directionalLight position={[10, 20, 10]} intensity={0.8} />
-      <directionalLight position={[-6, 8, -6]} intensity={0.5} />
-      <directionalLight position={[0, 10, -10]} intensity={0.3} />
+      {/* <ambientLight intensity={0.5} /> */}
+      <hemisphereLight args={[0xffffff, 0x444444, 0.5]} />
+      <directionalLight position={[10, 20, 10]} intensity={0.6} />
+      <directionalLight position={[-6, 8, -6]} intensity={0.4} />
+      <directionalLight position={[0, 10, -10]} intensity={0.2} />
     </>
   );
 }
@@ -279,6 +297,8 @@ export function MiniMap3D(props: MiniMap3DProps) {
         width: "43.75vw",
         bottom: 0,
         pointerEvents: "none",
+        maskImage: "radial-gradient(ellipse at 50% 80%, black 35%, transparent 60%)",
+        WebkitMaskImage: "radial-gradient(ellipse at 50% 70%, black 45%, transparent 70%)",
       }}
     >
       <Canvas

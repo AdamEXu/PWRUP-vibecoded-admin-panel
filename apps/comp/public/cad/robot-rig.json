@@ -8,7 +8,7 @@
   "joints": {
     "elevator_inner": {
       "nodeName": "InnerStage <1>",
-      "ntTopic": "/AdvantageKit/RealOutputs/Elevator/CurrentPosition",
+      "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentPosition",
       "type": "prismatic",
       "axis": [0, 1, 0],
       "limits": { "min": 0, "max": 1.2 },
@@ -70,8 +70,9 @@
       "nodeName": "ClimberControlInner",
       "type": "prismatic",
       "axis": [0, 0, 1],
-      "limits": { "min": -1.5, "max": 1.5 },
+      "limits": { "min": 0, "max": 0.61 },
       "defaultValue": 0,
+      "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentPosition",
       "description": "Climber inner stage",
       "debugSlider": { "label": "Climber Inner", "step": 0.01 }
     },
