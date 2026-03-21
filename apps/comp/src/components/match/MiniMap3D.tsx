@@ -12,7 +12,7 @@ import type { MatchPhase } from "@/lib/match/types";
 
 // ── Tuning constants ────────────────────────────────────────────────────────
 const DRACO_DECODER_PATH = "https://www.gstatic.com/draco/versioned/decoders/1.5.7/";
-const FIELD_URL = "/cad/field-2026.glb";
+const FIELD_URL = "/cad/field-2026.glb?v=2";
 const ROBOT_URL = "/cad/Robot-Full.glb";
 
 // Camera distance range: zoom=0 → far, zoom=1 → close
@@ -66,9 +66,25 @@ function useGLTFModel(url: string, useWrapper = false) {
       gltf.scene.traverse((node) => {
         restQuatsRef.current.set(node.name, node.quaternion.clone());
         restPosRef.current.set(node.name, node.position.clone());
+        if ((node as THREE.Mesh).isMesh) {
+          const mat = (node as THREE.Mesh).material;
+          const mats = Array.isArray(mat) ? mat : [mat];
+          for (const m of mats) {
+            // PBR materials need env maps to look right; force diffuse so lights work
+            if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+              (m as THREE.MeshStandardMaterial).metalness = 0;
+              (m as THREE.MeshStandardMaterial).roughness = 1;
+            }
+            if (m.transparent) {
+              m.depthWrite = false;
+            }
+          }
+        }
       });
-      // CAD models are Z-up; rotate to Y-up for Three.js
-      gltf.scene.rotation.x = -Math.PI / 2;
+      // Robot CAD is Z-up → rotate to Y-up; AdvantageScope field model is already Y-up
+      if (useWrapper) {
+        gltf.scene.rotation.x = -Math.PI / 2;
+      }
 
       if (useWrapper) {
         // Wrapper group: position/heading go here, Z-up→Y-up stays on inner scene
@@ -219,9 +235,11 @@ function Scene({ poseX, poseY, heading, isRedAlliance, isIdle, joints }: ScenePr
 
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[10, 20, 10]} intensity={1.0} castShadow />
-      <directionalLight position={[-6, 8, -6]} intensity={0.4} />
+      <ambientLight intensity={1.5} />
+      <hemisphereLight args={[0xffffff, 0x444444, 1.0]} />
+      <directionalLight position={[10, 20, 10]} intensity={0.8} />
+      <directionalLight position={[-6, 8, -6]} intensity={0.5} />
+      <directionalLight position={[0, 10, -10]} intensity={0.3} />
     </>
   );
 }
@@ -264,8 +282,8 @@ export function MiniMap3D(props: MiniMap3DProps) {
       }}
     >
       <Canvas
-        camera={{ position: [0, 8, 0], fov: 50, near: 0.1, far: 200 }}
-        gl={{ antialias: true }}
+        camera={{ position: [0, 8, 0], fov: 50, near: 0.1, far: 100 }}
+        gl={{ antialias: true, logarithmicDepthBuffer: true, alpha: true }}
         frameloop="always"
         style={{ width: "100%", height: "100%", pointerEvents: "none" }}
       >
