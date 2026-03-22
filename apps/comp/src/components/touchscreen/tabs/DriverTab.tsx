@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { DriverRobotViewer } from "@/components/robot3d/DriverRobotViewer";
 import { useRobotJoints } from "@/components/robot3d/useRobotJoints";
+import { useMatchState } from "@/lib/match/useMatchState";
 import rigConfig from "../../../../public/cad/robot-rig.json";
 
 export function DriverTab() {
   const [stateIndex, setStateIndex] = useState(0);
   const { jointValues } = useRobotJoints();
+  const { isRedAlliance } = useMatchState();
 
   return (
     <div className="relative h-full w-full bg-black">
@@ -15,6 +17,7 @@ export function DriverTab() {
         modelUrl={`/${rigConfig.model}`}
         joints={jointValues}
         stateIndex={stateIndex}
+        isRedAlliance={isRedAlliance}
       />
 
       {/* State pose buttons */}

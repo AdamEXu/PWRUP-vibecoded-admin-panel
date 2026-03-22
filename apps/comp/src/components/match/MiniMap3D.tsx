@@ -10,6 +10,7 @@ import { useRobotJoints } from "@/components/robot3d/useRobotJoints";
 import type { JointValue } from "@/components/robot3d/RobotViewer";
 import type { MatchPhase } from "@/lib/match/types";
 import fieldMeta from "../../../public/cad/field-meta.json";
+import rigConfig from "../../../public/cad/robot-rig.json";
 
 // ── Game piece node names to hide ───────────────────────────────────────────
 const GAME_PIECE_NODES = new Set(
@@ -53,12 +54,16 @@ function lerpAngle(a: number, b: number, t: number) {
 // When useWrapper=true, the GLTF scene is placed inside a wrapper Group.
 // The wrapper is what gets added to the Three.js scene and returned as rootRef.
 // The inner GLTF scene gets the Z-up→Y-up rotation; position/heading go on the wrapper.
-function useGLTFModel(url: string, useWrapper = false) {
+const BUMPER_RED = new THREE.Color(0xdd1111);
+const BUMPER_BLUE = new THREE.Color(0x1111dd);
+
+function useGLTFModel(url: string, useWrapper = false, bumperNodeNames: string[] = []) {
   const { scene: threeScene } = useThree();
   const rootRef = useRef<THREE.Object3D | null>(null);
   const innerRef = useRef<THREE.Object3D | null>(null);
   const restQuatsRef = useRef<Map<string, THREE.Quaternion>>(new Map());
   const restPosRef = useRef<Map<string, THREE.Vector3>>(new Map());
+  const bumperMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -70,6 +75,8 @@ function useGLTFModel(url: string, useWrapper = false) {
 
     loader.load(url, (gltf) => {
       if (rootRef.current) threeScene.remove(rootRef.current);
+      bumperMatsRef.current = [];
+      const bumperSet = new Set(bumperNodeNames);
       gltf.scene.traverse((node) => {
         restQuatsRef.current.set(node.name, node.quaternion.clone());
         restPosRef.current.set(node.name, node.position.clone());
@@ -84,6 +91,18 @@ function useGLTFModel(url: string, useWrapper = false) {
             }
             if (m.transparent) {
               m.depthWrite = false;
+            }
+          }
+          // Collect bumper materials (clone so we own them)
+          if (bumperSet.has(node.name)) {
+            const mesh = node as THREE.Mesh;
+            const bumperMats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            for (const m of bumperMats) {
+              if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+                const cloned = (m as THREE.MeshStandardMaterial).clone();
+                mesh.material = cloned;
+                bumperMatsRef.current.push(cloned);
+              }
             }
           }
         }
@@ -101,6 +120,7 @@ function useGLTFModel(url: string, useWrapper = false) {
         innerRef.current = gltf.scene;
         threeScene.add(wrapper);
       } else {
+        gltf.scene.rotation.y = Math.PI; // 2026: field X=0 is red wall (flipped vs prior years)
         gltf.scene.traverse((obj) => {
           if (GAME_PIECE_NODES.has(obj.name)) obj.visible = false;
         });
@@ -122,7 +142,7 @@ function useGLTFModel(url: string, useWrapper = false) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
-  return { rootRef, innerRef, restQuatsRef, restPosRef };
+  return { rootRef, innerRef, restQuatsRef, restPosRef, bumperMatsRef };
 }
 
 // ── Scene component ─────────────────────────────────────────────────────────
@@ -131,19 +151,29 @@ interface SceneProps {
   poseY: number;
   heading: number;
   isRedAlliance: boolean;
-  isIdle: boolean;
+  matchPhase: MatchPhase;
   joints: JointValue[];
 }
 
-function Scene({ poseX, poseY, heading, isRedAlliance, isIdle, joints }: SceneProps) {
+function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: SceneProps) {
   const { camera } = useThree();
   const { mapSettings } = useSettings();
+  const isIdle = !mapSettings.disableIdle && (matchPhase === "pre_match" || matchPhase === "post_match");
 
   // Load field (static) — rootRef keeps it attached to the scene
   useGLTFModel(FIELD_URL);
 
   // Load robot — use wrapper so heading (Y rotation) doesn't conflict with Z-up→Y-up (X rotation)
-  const { rootRef: robotRef, innerRef: robotInnerRef, restQuatsRef, restPosRef } = useGLTFModel(ROBOT_URL, true);
+  const { rootRef: robotRef, innerRef: robotInnerRef, restQuatsRef, restPosRef, bumperMatsRef } =
+    useGLTFModel(ROBOT_URL, true, rigConfig.bumperNodes);
+
+  // Recolor bumpers when alliance changes
+  useEffect(() => {
+    const color = isRedAlliance ? BUMPER_RED : BUMPER_BLUE;
+    for (const mat of bumperMatsRef.current) {
+      mat.color.copy(color);
+    }
+  }, [isRedAlliance, bumperMatsRef]);
 
   // Robot position in Three.js world space
   // WPILib: X = long axis (0→16.54), Y = short axis (0→8.21)
@@ -231,7 +261,7 @@ function Scene({ poseX, poseY, heading, isRedAlliance, isIdle, joints }: ScenePr
         // Driver mode: fixed from driver station end, based on alliance
         // Blue: drivers at -X end, looking toward +X → theta = 0
         // Red: drivers at +X end, looking toward -X → theta = π
-        const driverTheta = isRedAlliance ? Math.PI : 0;
+        const driverTheta = isRedAlliance ? Math.PI*0.5 : -Math.PI*0.5;
         targetTheta = lerpAngle(camThetaRef.current, driverTheta, 0.08);
       }
     }
@@ -273,7 +303,6 @@ interface MiniMap3DProps {
 
 function MiniMap3DInner(props: MiniMap3DProps) {
   const { jointValues } = useRobotJoints();
-  const isIdle = props.matchPhase === "pre_match" || props.matchPhase === "post_match";
 
   return (
     <Scene
@@ -281,7 +310,7 @@ function MiniMap3DInner(props: MiniMap3DProps) {
       poseY={props.poseY}
       heading={props.heading}
       isRedAlliance={props.isRedAlliance}
-      isIdle={isIdle}
+      matchPhase={props.matchPhase}
       joints={jointValues}
     />
   );

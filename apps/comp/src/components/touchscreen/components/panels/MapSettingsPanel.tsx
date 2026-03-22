@@ -3,10 +3,16 @@
 import { useSettings } from "@/lib/settings";
 import { CustomSelector, type SelectorOption } from "./CustomSelector";
 import { CustomSlider } from "./CustomSlider";
+import { colScroll } from "../../settings/constants";
 
 const MODE_OPTIONS: SelectorOption[] = [
   { id: "driver", symbol: "􀋓" },
   { id: "follow", symbol: "􀎭" },
+];
+
+const IDLE_OPTIONS: SelectorOption[] = [
+  { id: "false", symbol: "􀆅" },
+  { id: "true",  symbol: "􀆄" },
 ];
 
 export function MapSettingsPanel() {
@@ -18,12 +24,19 @@ export function MapSettingsPanel() {
         Map Settings
       </p>
 
-      <div className="flex flex-col gap-[10px] mt-[10px] w-full flex-1">
+      <div className={`flex flex-col gap-[10px] mt-[10px] w-full flex-1 ${colScroll}`}>
         <CustomSelector
           label="Mode"
           options={MODE_OPTIONS}
           value={mapSettings.mode}
           onChange={(id) => updateMapSettings({ mode: id as "follow" | "driver" })}
+        />
+
+        <CustomSelector
+          label="Idle Position"
+          options={IDLE_OPTIONS}
+          value={mapSettings.disableIdle ? "true" : "false"}
+          onChange={(id) => updateMapSettings({ disableIdle: id === "true" })}
         />
 
         <CustomSlider

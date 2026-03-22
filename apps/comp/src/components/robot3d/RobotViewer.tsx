@@ -6,6 +6,10 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
+import rigConfig from "../../../public/cad/robot-rig.json";
+
+const BUMPER_RED = new THREE.Color(0xdd1111);
+const BUMPER_BLUE = new THREE.Color(0x1111dd);
 
 export interface JointValue {
   /** Exact node name from the GLB */
@@ -17,11 +21,12 @@ export interface JointValue {
   type: "revolute" | "prismatic";
 }
 
-function Scene({ modelUrl, joints }: { modelUrl: string; joints: JointValue[] }) {
+function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: JointValue[]; isRedAlliance: boolean }) {
   const { camera, gl, scene } = useThree();
   const sceneRootRef = useRef<THREE.Object3D | null>(null);
   const restQuatsRef = useRef<Map<string, THREE.Quaternion>>(new Map());
   const restPosRef = useRef<Map<string, THREE.Vector3>>(new Map());
+  const bumperMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
 
   // OrbitControls
   useEffect(() => {
@@ -43,10 +48,23 @@ function Scene({ modelUrl, joints }: { modelUrl: string; joints: JointValue[] })
     loader.load(modelUrl, (gltf) => {
       if (sceneRootRef.current) scene.remove(sceneRootRef.current);
 
+      bumperMatsRef.current = [];
+      const bumperSet = new Set(rigConfig.bumperNodes);
       // Capture rest transforms before any joint is applied
       gltf.scene.traverse((node) => {
         restQuatsRef.current.set(node.name, node.quaternion.clone());
         restPosRef.current.set(node.name, node.position.clone());
+        if ((node as THREE.Mesh).isMesh && bumperSet.has(node.name)) {
+          const mesh = node as THREE.Mesh;
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const m of mats) {
+            if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+              const cloned = (m as THREE.MeshStandardMaterial).clone();
+              mesh.material = cloned;
+              bumperMatsRef.current.push(cloned);
+            }
+          }
+        }
       });
 
       gltf.scene.rotation.x = -Math.PI / 2;
@@ -63,6 +81,14 @@ function Scene({ modelUrl, joints }: { modelUrl: string; joints: JointValue[] })
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelUrl]);
+
+  // Recolor bumpers when alliance changes
+  useEffect(() => {
+    const color = isRedAlliance ? BUMPER_RED : BUMPER_BLUE;
+    for (const mat of bumperMatsRef.current) {
+      mat.color.copy(color);
+    }
+  }, [isRedAlliance]);
 
   // Apply joints every frame
   useFrame(() => {
@@ -98,7 +124,7 @@ function Scene({ modelUrl, joints }: { modelUrl: string; joints: JointValue[] })
   );
 }
 
-export function RobotViewer({ modelUrl, joints }: { modelUrl: string; joints: JointValue[] }) {
+export function RobotViewer({ modelUrl, joints, isRedAlliance = false }: { modelUrl: string; joints: JointValue[]; isRedAlliance?: boolean }) {
   return (
     <Canvas
       camera={{ position: [1.5, 1, 1.5], fov: 50, near: 0.01, far: 50 }}
@@ -106,7 +132,7 @@ export function RobotViewer({ modelUrl, joints }: { modelUrl: string; joints: Jo
       frameloop="always"
       style={{ width: "100%", height: "100%" }}
     >
-      <Scene modelUrl={modelUrl} joints={joints} />
+      <Scene modelUrl={modelUrl} joints={joints} isRedAlliance={isRedAlliance} />
     </Canvas>
   );
 }

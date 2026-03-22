@@ -2,17 +2,19 @@
 
 import { RobotViewer } from "@/components/robot3d/RobotViewer";
 import { useRobotJoints, primaryJoints } from "@/components/robot3d/useRobotJoints";
+import { useMatchState } from "@/lib/match/useMatchState";
 import rigConfig from "../../../../public/cad/robot-rig.json";
 
 export function Robot3DTab() {
   const { jointValues, resolvedValues, liveNtByJoint, manualValues, setManualValues } =
     useRobotJoints();
+  const { isRedAlliance } = useMatchState();
 
   return (
     <div className="flex h-full w-full gap-2 overflow-hidden p-2">
       {/* 3D viewport */}
       <div className="min-w-0 flex-1 overflow-hidden rounded-xl bg-black/30">
-        <RobotViewer modelUrl={`/${rigConfig.model}`} joints={jointValues} />
+        <RobotViewer modelUrl={`/${rigConfig.model}`} joints={jointValues} isRedAlliance={isRedAlliance} />
       </div>
 
       {/* Debug sliders */}

@@ -8,6 +8,10 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
 import type { JointValue } from "./RobotViewer";
 import cameraPoses from "../../../public/cad/camera-poses.json";
+import rigConfig from "../../../public/cad/robot-rig.json";
+
+const BUMPER_RED = new THREE.Color(0xdd1111);
+const BUMPER_BLUE = new THREE.Color(0x1111dd);
 
 // ---------------------------------------------------------------------------
 // Tunable constants (adjust these to taste)
@@ -106,10 +110,12 @@ function DriverScene({
   modelUrl,
   joints,
   stateIndex,
+  isRedAlliance,
 }: {
   modelUrl: string;
   joints: JointValue[];
   stateIndex: number;
+  isRedAlliance: boolean;
 }) {
   const { camera, gl, scene } = useThree();
   const perspCamera = camera as THREE.PerspectiveCamera;
@@ -119,6 +125,7 @@ function DriverScene({
   const sceneRootRef = useRef<THREE.Object3D | null>(null);
   const restQuatsRef = useRef<Map<string, THREE.Quaternion>>(new Map());
   const restPosRef = useRef<Map<string, THREE.Vector3>>(new Map());
+  const bumperMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const lastInputEndRef = useRef(performance.now());
   const isDraggingRef = useRef(false);
   const idleTriggeredRef = useRef(false);
@@ -184,10 +191,23 @@ function DriverScene({
     loader.load(modelUrl, (gltf) => {
       if (sceneRootRef.current) scene.remove(sceneRootRef.current);
 
+      bumperMatsRef.current = [];
+      const bumperSet = new Set(rigConfig.bumperNodes);
       // Capture rest transforms before any joint is applied
       gltf.scene.traverse((node) => {
         restQuatsRef.current.set(node.name, node.quaternion.clone());
         restPosRef.current.set(node.name, node.position.clone());
+        if ((node as THREE.Mesh).isMesh && bumperSet.has(node.name)) {
+          const mesh = node as THREE.Mesh;
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const m of mats) {
+            if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+              const cloned = (m as THREE.MeshStandardMaterial).clone();
+              mesh.material = cloned;
+              bumperMatsRef.current.push(cloned);
+            }
+          }
+        }
       });
 
       // Rotate from Z-up to Y-up
@@ -233,6 +253,14 @@ function DriverScene({
     };
     isTransitioningRef.current = true;
   }
+
+  // ---- Recolor bumpers when alliance changes ----
+  useEffect(() => {
+    const color = isRedAlliance ? BUMPER_RED : BUMPER_BLUE;
+    for (const mat of bumperMatsRef.current) {
+      mat.color.copy(color);
+    }
+  }, [isRedAlliance]);
 
   // ---- State transition trigger ----
   useEffect(() => {
@@ -357,10 +385,12 @@ export function DriverRobotViewer({
   modelUrl,
   joints,
   stateIndex,
+  isRedAlliance = false,
 }: {
   modelUrl: string;
   joints: JointValue[];
   stateIndex: number;
+  isRedAlliance?: boolean;
 }) {
   return (
     <Canvas
@@ -374,7 +404,7 @@ export function DriverRobotViewer({
       frameloop="always"
       style={{ width: "100%", height: "100%", background: "#000" }}
     >
-      <DriverScene modelUrl={modelUrl} joints={joints} stateIndex={stateIndex} />
+      <DriverScene modelUrl={modelUrl} joints={joints} stateIndex={stateIndex} isRedAlliance={isRedAlliance} />
     </Canvas>
   );
 }

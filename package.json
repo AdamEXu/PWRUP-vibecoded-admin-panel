@@ -6,17 +6,21 @@
   "scripts": {
     "dev:admin": "pnpm --filter @pwrup/admin dev",
     "dev:comp": "pnpm --filter @pwrup/comp dev",
+    "dev:debug": "pnpm --filter @pwrup/debug dev",
     "sync:pathplanner:dry": "./scripts/sync-pathplanner-from-fir.sh",
     "sync:pathplanner": "./scripts/sync-pathplanner-from-fir.sh --apply",
     "sync:autos:dry": "./scripts/sync-pathplanner-from-fir.sh --autos-only",
     "sync:autos": "./scripts/sync-pathplanner-from-fir.sh --apply --autos-only",
     "build:admin": "pnpm --filter @pwrup/admin build",
     "build:comp": "pnpm --filter @pwrup/comp build",
+    "build:debug": "pnpm --filter @pwrup/debug build",
     "dist:admin": "pnpm --filter @pwrup/admin dist",
     "dist:comp": "pnpm --filter @pwrup/comp dist",
+    "dist:debug": "pnpm --filter @pwrup/debug dist",
     "start:admin": "pnpm --filter @pwrup/admin start",
     "start:comp": "pnpm --filter @pwrup/comp start",
-    "build:all": "pnpm -r --filter @pwrup/admin --filter @pwrup/comp build",
-    "dist:all": "pnpm -r --filter @pwrup/admin --filter @pwrup/comp dist"
+    "start:debug": "pnpm --filter @pwrup/debug start",
+    "build:all": "pnpm -r --filter @pwrup/admin --filter @pwrup/comp --filter @pwrup/debug build",
+    "dist:all": "pnpm -r --filter @pwrup/admin --filter @pwrup/comp --filter @pwrup/debug dist"
   }
 }
