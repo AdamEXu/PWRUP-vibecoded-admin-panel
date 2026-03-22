@@ -261,7 +261,7 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
         // Driver mode: fixed from driver station end, based on alliance
         // Blue: drivers at -X end, looking toward +X → theta = 0
         // Red: drivers at +X end, looking toward -X → theta = π
-        const driverTheta = isRedAlliance ? Math.PI*0.5 : -Math.PI*0.5;
+        const driverTheta = isRedAlliance ? -Math.PI*0.5 : Math.PI*0.5;
         targetTheta = lerpAngle(camThetaRef.current, driverTheta, 0.08);
       }
     }
