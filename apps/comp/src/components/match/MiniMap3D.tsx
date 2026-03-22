@@ -30,10 +30,10 @@ const ZOOM_FAR = 11.05;
 // Polar angle range: angle=0 → top-down, angle=1 → level
 const POLAR_TOP = 0.08;  // nearly top-down
 const POLAR_LOW = 1.35;  // nearly level
-// Lerp factors per frame (~60fps target)
-const LERP_POS = 0.08;   // robot position follow
-const LERP_THETA = 0.05; // follow-mode azimuth
-const LERP_CAM = 0.06;   // idle camera transition
+// Lerp rates (normalized to 60fps; delta-time corrected via dtLerp)
+const LERP_POS = 0.15;   // robot position follow
+const LERP_THETA = 0.10; // follow-mode azimuth
+const LERP_CAM = 0.10;   // idle camera transition
 // Idle/showcase camera parameters
 
 const IDLE_AZIMUTH_SPEED = 0.0; // static (no orbit in idle for now)
@@ -48,6 +48,12 @@ function lerpAngle(a: number, b: number, t: number) {
   let diff = ((b - a + Math.PI) % (2 * Math.PI)) - Math.PI;
   if (diff < -Math.PI) diff += 2 * Math.PI;
   return a + diff * t;
+}
+
+// Returns a delta-time corrected lerp factor so smoothing feels the same at any framerate.
+// rate is the desired per-frame factor at 60fps.
+function dtLerp(rate: number, delta: number) {
+  return 1 - Math.pow(1 - rate, delta * 60);
 }
 
 // ── Model loader (field + robot) ──────────────────────────────────────────
@@ -196,7 +202,7 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
   const mapSettingsRef = useRef(mapSettings);
   mapSettingsRef.current = mapSettings;
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const wrapper = robotRef.current;
     const inner = robotInnerRef.current;
 
@@ -235,34 +241,34 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
     const targetZ = lerp(0, robotWorldZ, zoomFactor);
     camTargetRef.current.lerp(
       new THREE.Vector3(robotWorldX, 0.3, targetZ),
-      LERP_POS,
+      dtLerp(LERP_POS, delta),
     );
 
     // ── Desired camera parameters ─────────────────────────────────────
     const targetPhi = POLAR_LOW - mapSettingsRef.current.angle * (POLAR_LOW - POLAR_TOP);
     const targetDist = ZOOM_FAR + mapSettingsRef.current.zoom * (ZOOM_NEAR - ZOOM_FAR);
 
-    camPhiRef.current = lerp(camPhiRef.current, targetPhi, 0.1);
-    camDistRef.current = lerp(camDistRef.current, targetDist, 0.1);
+    camPhiRef.current = lerp(camPhiRef.current, targetPhi, dtLerp(0.1, delta));
+    camDistRef.current = lerp(camDistRef.current, targetDist, dtLerp(0.1, delta));
 
     let targetTheta: number;
 
     if (isIdle) {
       // Showcase: fixed pleasant azimuth only; angle/zoom still follow sliders
-      targetTheta = lerpAngle(camThetaRef.current, IDLE_THETA_OFFSET, LERP_CAM);
+      targetTheta = lerpAngle(camThetaRef.current, IDLE_THETA_OFFSET, dtLerp(LERP_CAM, delta));
     } else {
 
       if (mapSettings.mode === "follow") {
         // Camera is behind robot (climber side): robot heading points toward intake
         // With negated X and model default forward +worldZ: camera behind = heading + π/2
         const desiredTheta = heading + Math.PI / 2;
-        targetTheta = lerpAngle(camThetaRef.current, desiredTheta, LERP_THETA);
+        targetTheta = lerpAngle(camThetaRef.current, desiredTheta, dtLerp(LERP_THETA, delta));
       } else {
         // Driver mode: fixed from driver station end, based on alliance
         // Blue: drivers at -X end, looking toward +X → theta = 0
         // Red: drivers at +X end, looking toward -X → theta = π
         const driverTheta = isRedAlliance ? -Math.PI*0.5 : Math.PI*0.5;
-        targetTheta = lerpAngle(camThetaRef.current, driverTheta, 0.08);
+        targetTheta = lerpAngle(camThetaRef.current, driverTheta, dtLerp(0.10, delta));
       }
     }
 
