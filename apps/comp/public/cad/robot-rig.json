@@ -6,45 +6,6 @@
     "position": [0, 0, 0]
   },
   "joints": {
-    "elevator_inner": {
-      "nodeName": "InnerStage <1>",
-      "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentPosition",
-      "type": "prismatic",
-      "axis": [0, 1, 0],
-      "limits": { "min": 0, "max": 1.2 },
-      "defaultValue": 0,
-      "smoothing": 0.15,
-      "description": "Elevator inner stage vertical translation"
-    },
-    "launcher_pivot": {
-      "nodeName": "LauncherFull-V1.2 <1>",
-      "type": "revolute",
-      "axis": [1, 0, 0],
-      "limits": { "min": 0, "max": 1.2 },
-      "defaultValue": 0,
-      "smoothing": 0.1,
-      "description": "Launcher tilt angle"
-    },
-    "intake_wrist": {
-      "nodeName": "IntakeMain-V1.1 <1>",
-      "type": "revolute",
-      "axis": [1, 0, 0],
-      "limits": { "min": -1.57, "max": 0 },
-      "defaultValue": 0,
-      "ntTopic": "/AdvantageKit/RealOutputs/IntakeSubsystem/WristPosition",
-      "inputTransform": { "scale": -6.283185307179586, "offset": 0 },
-      "smoothing": 0.2,
-      "description": "Intake wrist pivot"
-    },
-    "indexer": {
-      "nodeName": "IndexFull-V1.2 <1>",
-      "type": "revolute",
-      "axis": [1, 0, 0],
-      "limits": { "min": -0.5, "max": 0.5 },
-      "defaultValue": 0,
-      "smoothing": 0.1,
-      "description": "Indexer mechanism angle"
-    },
     "turret": {
       "nodeName": "TurretRControl",
       "type": "revolute",
@@ -91,6 +52,7 @@
       "axis": [1, 0, 0],
       "limits": { "min": -3.14, "max": 3.14 },
       "defaultValue": 0,
+      "ntTopic": "/AdvantageKit/RealOutputs/IntakeSubsystem/WristPosition",
       "description": "Index wrist pivot",
       "debugSlider": { "label": "Index Wrist", "step": 0.01 }
     }
