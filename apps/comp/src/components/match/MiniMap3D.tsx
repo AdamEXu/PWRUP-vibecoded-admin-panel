@@ -26,7 +26,7 @@ const ROBOT_URL = "/cad/Robot-Full.glb";
 const ZOOM_NEAR = 2;
 // At ZOOM_FAR, the 8.21m short axis fills ~80% of the viewport width
 // (FOV=50°, aspect≈1.4 → hFOV≈66° → width = 2*d*tan(33°) ≈ 1.3*d; 8.21/(0.8*1.3) ≈ 7.9)
-const ZOOM_FAR = 8.5;
+const ZOOM_FAR = 11.05;
 // Polar angle range: angle=0 → top-down, angle=1 → level
 const POLAR_TOP = 0.08;  // nearly top-down
 const POLAR_LOW = 1.35;  // nearly level
@@ -326,8 +326,10 @@ export function MiniMap3D(props: MiniMap3DProps) {
         width: "43.75vw",
         bottom: 0,
         pointerEvents: "none",
-        maskImage: "radial-gradient(ellipse at 50% 80%, black 35%, transparent 60%)",
-        WebkitMaskImage: "radial-gradient(ellipse at 50% 70%, black 45%, transparent 70%)",
+        maskImage: "url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><defs><filter id='s'><feGaussianBlur stdDeviation='10'/></filter></defs><rect x='14' y='10' width='172' height='220' rx='60' fill='white' filter='url(%23s)'/></svg>\")",
+        WebkitMaskImage: "url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><defs><filter id='s'><feGaussianBlur stdDeviation='10'/></filter></defs><rect x='14' y='10' width='172' height='220' rx='60' fill='white' filter='url(%23s)'/></svg>\")",
+        maskSize: "100% 100%",
+        WebkitMaskSize: "100% 100%",
       }}
     >
       <Canvas

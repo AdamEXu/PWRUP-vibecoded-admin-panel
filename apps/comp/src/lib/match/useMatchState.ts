@@ -155,12 +155,12 @@ export function useMatchState(): MatchState {
   const { value: robotPoseX } = useNTopic<number>(
     NT.MATCH_HUD_POSE_X,
     NetworkTablesTypeInfos.kDouble,
-    0,
+    8.27, // field center X (WPILib coords)
   );
   const { value: robotPoseY } = useNTopic<number>(
     NT.MATCH_HUD_POSE_Y,
     NetworkTablesTypeInfos.kDouble,
-    0,
+    4.105, // field center Y (WPILib coords)
   );
   const { value: robotHeading } = useNTopic<number>(
     NT.MATCH_HUD_HEADING,
