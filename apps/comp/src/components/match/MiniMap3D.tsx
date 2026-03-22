@@ -120,7 +120,6 @@ function useGLTFModel(url: string, useWrapper = false, bumperNodeNames: string[]
         innerRef.current = gltf.scene;
         threeScene.add(wrapper);
       } else {
-        gltf.scene.rotation.y = Math.PI; // 2026: field X=0 is red wall (flipped vs prior years)
         gltf.scene.traverse((obj) => {
           if (GAME_PIECE_NODES.has(obj.name)) obj.visible = false;
         });
@@ -176,11 +175,12 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
   }, [isRedAlliance, bumperMatsRef]);
 
   // Robot position in Three.js world space
-  // WPILib: X = long axis (0→16.54), Y = short axis (0→8.21)
-  // Three.js: center field at origin, X = WPILib X - half, Z = WPILib Y - half
+  // WPILib 2026: X=0 is red wall, X=16.54 is blue wall (flipped vs prior years)
+  // Negate X so red robots land at +worldX and blue at -worldX (matching the field model)
+  // Three.js: center field at origin, Z = WPILib Y - half
   const HALF_W = 8.27;
   const HALF_H = 4.105;
-  const robotWorldX = poseX - HALF_W;
+  const robotWorldX = HALF_W - poseX; // negated: red at +X, blue at -X
   const robotWorldZ = poseY - HALF_H;
 
   // Smooth camera target (robot position, lerped)
@@ -203,9 +203,9 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
     // ── Robot position + heading on the wrapper group ─────────────────
     if (wrapper) {
       wrapper.position.set(robotWorldX, 0, robotWorldZ);
-      // WPILib heading: CCW+ radians, 0 = facing +X
-      // Three.js Y rotation: CCW+ when viewed from above
-      wrapper.rotation.y = -heading;
+      // WPILib 2026: heading CCW+, 0 = facing +poseX (toward blue wall = -worldX)
+      // Model default forward is +worldZ; with negated X, correct formula is heading - π/2
+      wrapper.rotation.y = heading - Math.PI / 2;
     }
 
     // ── Apply joints on the inner scene (which has the Z-up→Y-up rotation) ──
@@ -254,8 +254,8 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
 
       if (mapSettings.mode === "follow") {
         // Camera is behind robot (climber side): robot heading points toward intake
-        // Camera looks from heading + π direction
-        const desiredTheta = -heading + Math.PI;
+        // With negated X and model default forward +worldZ: camera behind = heading + π/2
+        const desiredTheta = heading + Math.PI / 2;
         targetTheta = lerpAngle(camThetaRef.current, desiredTheta, LERP_THETA);
       } else {
         // Driver mode: fixed from driver station end, based on alliance
