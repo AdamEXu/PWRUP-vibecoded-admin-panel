@@ -83,7 +83,7 @@ export function TouchscreenDashboard() {
       onDragEnd={handleDragEnd}
     >
       <div className="fixed top-0 bottom-0 z-0 bg-black" style={driverLayerStyle}>
-        <DriverTab />
+        <DriverTab isActive={isDriverBase} />
       </div>
 
       {prevOverlayTab !== null && (

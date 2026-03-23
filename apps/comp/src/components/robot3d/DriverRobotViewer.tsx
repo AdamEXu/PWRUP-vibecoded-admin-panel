@@ -386,11 +386,13 @@ export function DriverRobotViewer({
   joints,
   stateIndex,
   isRedAlliance = false,
+  isActive,
 }: {
   modelUrl: string;
   joints: JointValue[];
   stateIndex: number;
   isRedAlliance?: boolean;
+  isActive?: boolean;
 }) {
   return (
     <Canvas
@@ -401,7 +403,7 @@ export function DriverRobotViewer({
         far: 50,
       }}
       gl={{ antialias: true }}
-      frameloop="always"
+      frameloop={isActive === false ? "never" : "always"}
       style={{ width: "100%", height: "100%", background: "#000" }}
     >
       <DriverScene modelUrl={modelUrl} joints={joints} stateIndex={stateIndex} isRedAlliance={isRedAlliance} />

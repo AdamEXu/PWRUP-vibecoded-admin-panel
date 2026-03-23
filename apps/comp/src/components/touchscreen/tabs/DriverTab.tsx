@@ -6,7 +6,7 @@ import { useRobotJoints } from "@/components/robot3d/useRobotJoints";
 import { useMatchState } from "@/lib/match/useMatchState";
 import rigConfig from "../../../../public/cad/robot-rig.json";
 
-export function DriverTab() {
+export function DriverTab({ isActive }: { isActive?: boolean }) {
   const [stateIndex, setStateIndex] = useState(0);
   const { jointValues } = useRobotJoints();
   const { isRedAlliance } = useMatchState();
@@ -18,6 +18,7 @@ export function DriverTab() {
         joints={jointValues}
         stateIndex={stateIndex}
         isRedAlliance={isRedAlliance}
+        isActive={isActive}
       />
 
       {/* State pose buttons */}
