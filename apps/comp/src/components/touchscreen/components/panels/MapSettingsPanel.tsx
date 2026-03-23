@@ -6,20 +6,20 @@ import { CustomSlider } from "./CustomSlider";
 import { colScroll } from "../../settings/constants";
 
 const MODE_OPTIONS: SelectorOption[] = [
-  { id: "driver", symbol: "􀋓" },
-  { id: "follow", symbol: "􀎭" },
+  { id: "driver", symbol: "􀋓", filledSymbol: "􀋔" },
+  { id: "follow", symbol: "􀎬", filledSymbol: "􀎭" },
 ];
 
 export function MapSettingsPanel() {
   const { mapSettings, updateMapSettings, resetMapSettings } = useSettings();
 
   return (
-    <div className="flex flex-col h-full items-start p-[10px] shrink-0 w-[426px]">
+    <div className="flex flex-col h-full items-start p-[16px] shrink-0 w-[426px]">
       <p className="font-['Inter',sans-serif] font-medium text-[36px] text-white leading-[normal]">
         Map Settings
       </p>
 
-      <div className={`flex flex-col gap-[10px] mt-[10px] w-full flex-1 ${colScroll}`}>
+      <div className={`flex flex-col gap-[20px] mt-[16px] w-full flex-1 pr-[10px] ${colScroll}`}>
         <CustomSelector
           label="Mode"
           options={MODE_OPTIONS}
@@ -38,15 +38,16 @@ export function MapSettingsPanel() {
           value={mapSettings.zoom}
           onChange={(v) => updateMapSettings({ zoom: v })}
         />
-      </div>
 
-      {/* Reset button */}
-      <button
-        onClick={resetMapSettings}
-        className="mt-auto self-end font-['Inter',sans-serif] font-medium text-[20px] text-white/60 hover:text-white transition-colors duration-150 px-[16px] py-[10px] rounded-[8px] border border-white/20 hover:border-white/40"
-      >
-        Reset
-      </button>
+        {/* Reset button */}
+        <button
+          type="button"
+          onClick={resetMapSettings}
+          className="block w-full h-12 border-2 border-white/20 bg-transparent px-6 text-xl font-semibold text-zinc-400"
+        >
+          Reset
+        </button>
+      </div>
     </div>
   );
 }

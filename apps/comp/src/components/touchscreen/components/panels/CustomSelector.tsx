@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface SelectorOption {
   id: string;
-  symbol: string; // SF Symbol character
+  symbol: string;       // unfilled SF Symbol character
+  filledSymbol?: string; // filled variant, used in the selected state
 }
 
 interface CustomSelectorProps {
@@ -218,7 +219,7 @@ export function CustomSelector({ options, value, onChange, label }: CustomSelect
                 className="sf-symbol leading-none"
                 style={{ fontSize: 36, color: "#70cd35", pointerEvents: "none" }}
               >
-                {option.symbol}
+                {option.filledSymbol ?? option.symbol}
               </span>
             </div>
           ))}
