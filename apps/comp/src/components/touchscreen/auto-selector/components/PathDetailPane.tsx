@@ -118,9 +118,15 @@ export function PathDetailPane({
               <div className="relative z-10 bg-black/60 px-3 py-1 text-[28px] font-semibold text-white text-center">
                 <p>Failed to load preview</p>
                 <p className="text-lg">{errorEntry.text}</p>
-                <p className="text-xs mt-2" style={{
-                  lineHeight: 1
-                }}>The error does <b className="bold italic">not</b> mean the auto is broken, you can select it and it'll probably still work?</p>
+                <p
+                  className="text-xs mt-2"
+                  style={{
+                    lineHeight: 1,
+                  }}
+                >
+                  The error does <b className="bold italic">not</b> mean the auto is broken, you can
+                  select it and it&apos;ll probably still work?
+                </p>
               </div>
             </>
           )}
