@@ -22,7 +22,7 @@ export type AimMode = "shooter_disabled" | "gps_auto" | "manual_aiming";
 
 export interface MatchState {
   // Published match state
-  isRedAlliance: boolean;
+  isRedAlliance: boolean | null;
   /** 'R' = red alliance hub deactivates first; 'B' = blue first; '' = unknown */
   gameSpecificMessage: string;
   /** Synthetic WPILib-style bitmask preserved for compatibility with mock logic. */

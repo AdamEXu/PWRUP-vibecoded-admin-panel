@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -11,6 +11,10 @@ import { useSettings } from "@/lib/settings";
 
 const BUMPER_RED = new THREE.Color(0xdd1111);
 const BUMPER_BLUE = new THREE.Color(0x1111dd);
+
+// Singleton DRACOLoader — shared across all useLoader calls in this module
+const _dracoLoader = new DRACOLoader();
+_dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
 
 export interface JointValue {
   /** Exact node name from the GLB */
@@ -22,13 +26,8 @@ export interface JointValue {
   type: "revolute" | "prismatic";
 }
 
-function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: JointValue[]; isRedAlliance: boolean }) {
+function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: JointValue[]; isRedAlliance: boolean | null }) {
   const { camera, gl, scene } = useThree();
-  const sceneRootRef = useRef<THREE.Object3D | null>(null);
-  const restQuatsRef = useRef<Map<string, THREE.Quaternion>>(new Map());
-  const restPosRef = useRef<Map<string, THREE.Vector3>>(new Map());
-  const bumperMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
-  const jointNodeCacheRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const jointAxisCacheRef = useRef<Map<string, THREE.Vector3>>(new Map());
   const _tmpQuat = useRef(new THREE.Quaternion());
 
@@ -42,76 +41,63 @@ function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: 
     return () => controls.dispose();
   }, [camera, gl.domElement]);
 
-  // Load GLB
-  useEffect(() => {
-    const draco = new DRACOLoader();
-    draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
-    const loader = new GLTFLoader();
-    loader.setDRACOLoader(draco);
+  // Load GLB — result is cached globally by useLoader; suspends until ready
+  const gltf = useLoader(GLTFLoader, modelUrl, (l) => l.setDRACOLoader(_dracoLoader));
 
-    loader.load(modelUrl, (gltf) => {
-      if (sceneRootRef.current) scene.remove(sceneRootRef.current);
+  // Clone the cached scene and derive all per-instance data once per model
+  const { clonedScene, nodeMap, restQuats, restPos, bumperMats } = useMemo(() => {
+    const clone = gltf.scene.clone(true);
+    clone.rotation.x = -Math.PI / 2;
 
-      bumperMatsRef.current = [];
-      jointNodeCacheRef.current.clear();
-      const bumperSet = new Set(rigConfig.bumperNodes);
-      // Capture rest transforms before any joint is applied
-      gltf.scene.traverse((node) => {
-        restQuatsRef.current.set(node.name, node.quaternion.clone());
-        restPosRef.current.set(node.name, node.position.clone());
-        if ((node as THREE.Mesh).isMesh && bumperSet.has(node.name)) {
-          const mesh = node as THREE.Mesh;
-          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-          for (const m of mats) {
-            if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-              const cloned = (m as THREE.MeshStandardMaterial).clone();
-              mesh.material = cloned;
-              bumperMatsRef.current.push(cloned);
-            }
+    const nodeMap = new Map<string, THREE.Object3D>();
+    const restQuats = new Map<string, THREE.Quaternion>();
+    const restPos = new Map<string, THREE.Vector3>();
+    const bumperMats: THREE.MeshStandardMaterial[] = [];
+    const bumperSet = new Set(rigConfig.bumperNodes);
+
+    clone.traverse((node) => {
+      nodeMap.set(node.name, node);
+      restQuats.set(node.name, node.quaternion.clone());
+      restPos.set(node.name, node.position.clone());
+
+      if ((node as THREE.Mesh).isMesh && bumperSet.has(node.name)) {
+        const mesh = node as THREE.Mesh;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const m of mats) {
+          if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+            const clonedMat = (m as THREE.MeshStandardMaterial).clone();
+            mesh.material = clonedMat;
+            bumperMats.push(clonedMat);
           }
         }
-      });
-
-      gltf.scene.rotation.x = -Math.PI / 2;
-      sceneRootRef.current = gltf.scene;
-      scene.add(gltf.scene);
+      }
     });
 
-    return () => {
-      if (sceneRootRef.current) {
-        scene.remove(sceneRootRef.current);
-        sceneRootRef.current = null;
-      }
-      draco.dispose();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelUrl]);
+    return { clonedScene: clone, nodeMap, restQuats, restPos, bumperMats };
+  }, [gltf.scene]);
 
-  // Recolor bumpers when alliance changes
+  // Attach/detach cloned scene
   useEffect(() => {
+    scene.add(clonedScene);
+    return () => { scene.remove(clonedScene); };
+  }, [clonedScene, scene]);
+
+  // Recolor bumpers when alliance changes — null means no value yet, keep model color
+  useEffect(() => {
+    if (isRedAlliance == null) return;
     const color = isRedAlliance ? BUMPER_RED : BUMPER_BLUE;
-    for (const mat of bumperMatsRef.current) {
-      mat.color.copy(color);
-    }
-  }, [isRedAlliance]);
+    for (const mat of bumperMats) mat.color.copy(color);
+  }, [isRedAlliance, bumperMats]);
 
   // Apply joints every frame
   useFrame(() => {
-    const root = sceneRootRef.current;
-    if (!root) return;
-
     for (const joint of joints) {
-      let node = jointNodeCacheRef.current.get(joint.nodeName);
-      if (!node) {
-        const found = root.getObjectByName(joint.nodeName);
-        if (!found) continue;
-        jointNodeCacheRef.current.set(joint.nodeName, found);
-        node = found;
-      }
+      const node = nodeMap.get(joint.nodeName);
+      if (!node) continue;
 
-      const restQuat = restQuatsRef.current.get(joint.nodeName);
-      const restPos = restPosRef.current.get(joint.nodeName);
-      if (!restQuat || !restPos) continue;
+      const restQuat = restQuats.get(joint.nodeName);
+      const restPosVec = restPos.get(joint.nodeName);
+      if (!restQuat || !restPosVec) continue;
 
       let axis = jointAxisCacheRef.current.get(joint.nodeName);
       if (!axis) {
@@ -123,7 +109,7 @@ function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: 
         _tmpQuat.current.setFromAxisAngle(axis, joint.value);
         node.quaternion.copy(restQuat).multiply(_tmpQuat.current);
       } else {
-        node.position.copy(restPos).addScaledVector(axis, joint.value);
+        node.position.copy(restPosVec).addScaledVector(axis, joint.value);
       }
     }
   });
@@ -138,7 +124,7 @@ function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: 
   );
 }
 
-export function RobotViewer({ modelUrl, joints, isRedAlliance = false }: { modelUrl: string; joints: JointValue[]; isRedAlliance?: boolean }) {
+export function RobotViewer({ modelUrl, joints, isRedAlliance = null }: { modelUrl: string; joints: JointValue[]; isRedAlliance?: boolean | null }) {
   const { visualSettings } = useSettings();
   return (
     <Canvas
@@ -148,7 +134,9 @@ export function RobotViewer({ modelUrl, joints, isRedAlliance = false }: { model
       frameloop="always"
       style={{ width: "100%", height: "100%" }}
     >
-      <Scene modelUrl={modelUrl} joints={joints} isRedAlliance={isRedAlliance} />
+      <Suspense fallback={null}>
+        <Scene modelUrl={modelUrl} joints={joints} isRedAlliance={isRedAlliance} />
+      </Suspense>
     </Canvas>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import * as THREE from "three";
@@ -21,9 +21,15 @@ const GAME_PIECE_NODES = new Set(
 );
 
 // ── Tuning constants ────────────────────────────────────────────────────────
-const DRACO_DECODER_PATH = "https://www.gstatic.com/draco/versioned/decoders/1.5.7/";
 const FIELD_URL = "/cad/field-2026.glb?v=2";
 const ROBOT_URL = "/cad/Robot-Full.glb";
+
+// Singleton DRACOLoader — shared across all useLoader calls in this module
+const _dracoLoader = new DRACOLoader();
+_dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+
+// Stable empty array so useGLTFModel's default doesn't trigger useMemo re-runs
+const NO_BUMPER_NODES: string[] = [];
 
 // Camera distance range: zoom=0 → far, zoom=1 → close
 const ZOOM_NEAR = 2;
@@ -56,128 +62,106 @@ function dtLerp(rate: number, delta: number) {
 
 // ── Model loader (field + robot) ──────────────────────────────────────────
 // When useWrapper=true, the GLTF scene is placed inside a wrapper Group.
-// The wrapper is what gets added to the Three.js scene and returned as rootRef.
+// The wrapper is what gets added to the Three.js scene and returned as root.
 // The inner GLTF scene gets the Z-up→Y-up rotation; position/heading go on the wrapper.
 const BUMPER_RED = new THREE.Color(0xdd1111);
 const BUMPER_BLUE = new THREE.Color(0x1111dd);
 
-function useGLTFModel(url: string, useWrapper = false, bumperNodeNames: string[] = []) {
+function useGLTFModel(url: string, useWrapper = false, bumperNodeNames: string[] = NO_BUMPER_NODES) {
   const { scene: threeScene } = useThree();
-  const rootRef = useRef<THREE.Object3D | null>(null);
-  const innerRef = useRef<THREE.Object3D | null>(null);
-  const restQuatsRef = useRef<Map<string, THREE.Quaternion>>(new Map());
-  const restPosRef = useRef<Map<string, THREE.Vector3>>(new Map());
-  const bumperMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
-  const nodeMapRef = useRef<Map<string, THREE.Object3D>>(new Map());
-  const loadedRef = useRef(false);
 
-  useEffect(() => {
-    loadedRef.current = false;
-    const draco = new DRACOLoader();
-    draco.setDecoderPath(DRACO_DECODER_PATH);
-    const loader = new GLTFLoader();
-    loader.setDRACOLoader(draco);
+  // Cached globally by useLoader — only parsed once per URL across the entire app
+  const gltf = useLoader(GLTFLoader, url, (l) => l.setDRACOLoader(_dracoLoader));
 
-    loader.load(url, (gltf) => {
-      if (rootRef.current) threeScene.remove(rootRef.current);
-      bumperMatsRef.current = [];
-      nodeMapRef.current.clear();
-      const bumperSet = new Set(bumperNodeNames);
-      gltf.scene.traverse((node) => {
-        restQuatsRef.current.set(node.name, node.quaternion.clone());
-        restPosRef.current.set(node.name, node.position.clone());
-        nodeMapRef.current.set(node.name, node);
-        if ((node as THREE.Mesh).isMesh) {
-          const mat = (node as THREE.Mesh).material;
-          const mats = Array.isArray(mat) ? mat : [mat];
-          for (const m of mats) {
-            // PBR materials need env maps to look right; force diffuse so lights work
-            if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-              (m as THREE.MeshStandardMaterial).metalness = 0;
-              (m as THREE.MeshStandardMaterial).roughness = 1;
-            }
-            if (m.transparent) {
-              m.depthWrite = false;
-            }
+  // Clone the cached scene and derive all per-instance data
+  const result = useMemo(() => {
+    const clone = gltf.scene.clone(true);
+
+    const nodeMap = new Map<string, THREE.Object3D>();
+    const restQuats = new Map<string, THREE.Quaternion>();
+    const restPos = new Map<string, THREE.Vector3>();
+    const bumperMats: THREE.MeshStandardMaterial[] = [];
+    const bumperSet = new Set(bumperNodeNames);
+
+    clone.traverse((node) => {
+      nodeMap.set(node.name, node);
+      restQuats.set(node.name, node.quaternion.clone());
+      restPos.set(node.name, node.position.clone());
+
+      if ((node as THREE.Mesh).isMesh) {
+        const mat = (node as THREE.Mesh).material;
+        const mats = Array.isArray(mat) ? mat : [mat];
+        for (const m of mats) {
+          // PBR materials need env maps to look right; force diffuse so lights work
+          if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+            (m as THREE.MeshStandardMaterial).metalness = 0;
+            (m as THREE.MeshStandardMaterial).roughness = 1;
           }
-          // Collect bumper materials (clone so we own them)
-          if (bumperSet.has(node.name)) {
-            const mesh = node as THREE.Mesh;
-            const bumperMats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-            for (const m of bumperMats) {
-              if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-                const cloned = (m as THREE.MeshStandardMaterial).clone();
-                mesh.material = cloned;
-                bumperMatsRef.current.push(cloned);
-              }
+          if (m.transparent) m.depthWrite = false;
+        }
+        // Collect bumper materials (clone so we own them)
+        if (bumperSet.has(node.name)) {
+          const mesh = node as THREE.Mesh;
+          const bumperMatArr = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const m of bumperMatArr) {
+            if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+              const clonedMat = (m as THREE.MeshStandardMaterial).clone();
+              mesh.material = clonedMat;
+              bumperMats.push(clonedMat);
             }
           }
         }
-      });
-      // Robot CAD is Z-up → rotate to Y-up; AdvantageScope field model is already Y-up
-      if (useWrapper) {
-        gltf.scene.rotation.x = -Math.PI / 2;
       }
-
-      if (useWrapper) {
-        // Wrapper group: position/heading go here, Z-up→Y-up stays on inner scene
-        const wrapper = new THREE.Group();
-        wrapper.add(gltf.scene);
-        rootRef.current = wrapper;
-        innerRef.current = gltf.scene;
-        threeScene.add(wrapper);
-      } else {
-        gltf.scene.traverse((obj) => {
-          if (GAME_PIECE_NODES.has(obj.name)) obj.visible = false;
-        });
-        rootRef.current = gltf.scene;
-        innerRef.current = gltf.scene;
-        threeScene.add(gltf.scene);
-      }
-      loadedRef.current = true;
     });
 
-    return () => {
-      if (rootRef.current) {
-        threeScene.remove(rootRef.current);
-        rootRef.current = null;
-        innerRef.current = null;
-      }
-      draco.dispose();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+    // Robot CAD is Z-up → rotate to Y-up; AdvantageScope field model is already Y-up
+    if (useWrapper) {
+      clone.rotation.x = -Math.PI / 2;
+      const wrapper = new THREE.Group();
+      wrapper.add(clone);
+      return { root: wrapper, inner: clone, nodeMap, restQuats, restPos, bumperMats };
+    } else {
+      clone.traverse((obj) => {
+        if (GAME_PIECE_NODES.has(obj.name)) obj.visible = false;
+      });
+      return { root: clone, inner: clone, nodeMap, restQuats, restPos, bumperMats };
+    }
+  }, [gltf.scene, useWrapper, bumperNodeNames]);
 
-  return { rootRef, innerRef, restQuatsRef, restPosRef, bumperMatsRef, nodeMapRef };
+  // Attach/detach from Three.js scene
+  useEffect(() => {
+    threeScene.add(result.root);
+    return () => { threeScene.remove(result.root); };
+  }, [result.root, threeScene]);
+
+  return result;
 }
 
 // ── Scene component ─────────────────────────────────────────────────────────
 interface SceneProps {
   poseRef: React.RefObject<{ x: number; y: number; heading: number }>;
   jointValuesRef: React.RefObject<JointValue[]>;
-  isRedAlliance: boolean;
+  isRedAlliance: boolean | null;
 }
 
 function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
   const { camera } = useThree();
   const { mapSettings } = useSettings();
 
-  // Load field (static) — rootRef keeps it attached to the scene
+  // Load field (static)
   useGLTFModel(FIELD_URL);
 
   // Load robot — use wrapper so heading (Y rotation) doesn't conflict with Z-up→Y-up (X rotation)
-  const { rootRef: robotRef, innerRef: robotInnerRef, restQuatsRef, restPosRef, bumperMatsRef, nodeMapRef } =
-    useGLTFModel(ROBOT_URL, true, rigConfig.bumperNodes);
+  const robot = useGLTFModel(ROBOT_URL, true, rigConfig.bumperNodes);
   const jointAxisCacheRef = useRef<Map<string, THREE.Vector3>>(new Map());
   const _tmpQuat = useRef(new THREE.Quaternion());
 
-  // Recolor bumpers when alliance changes
+  // Recolor bumpers when alliance changes — null means no value yet, keep model color
   useEffect(() => {
+    if (isRedAlliance == null) return;
     const color = isRedAlliance ? BUMPER_RED : BUMPER_BLUE;
-    for (const mat of bumperMatsRef.current) {
-      mat.color.copy(color);
-    }
-  }, [isRedAlliance, bumperMatsRef]);
+    for (const mat of robot.bumperMats) mat.color.copy(color);
+  }, [isRedAlliance, robot.bumperMats]);
 
   // Robot position in Three.js world space
   // WPILib 2026: X=0 is red wall, X=16.54 is blue wall (flipped vs prior years)
@@ -203,9 +187,12 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
   const mapSettingsRef = useRef(mapSettings);
   mapSettingsRef.current = mapSettings;
 
+  // Reusable Vector3 for camera lerp target (avoids allocation per frame)
+  const _tmpCamTarget = useRef(new THREE.Vector3());
+
   useFrame((_, delta) => {
-    const wrapper = robotRef.current;
-    const inner = robotInnerRef.current;
+    const wrapper = robot.root;
+    const inner = robot.inner;
 
     // Read latest pose + joints directly from refs — no React render cycle needed.
     const { x: poseX, y: poseY, heading } = poseRef.current;
@@ -223,11 +210,11 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
     // ── Apply joints on the inner scene (which has the Z-up→Y-up rotation) ──
     if (inner) {
       for (const joint of jointValuesRef.current) {
-        const node = nodeMapRef.current.get(joint.nodeName);
+        const node = robot.nodeMap.get(joint.nodeName);
         if (!node) continue;
-        const restQuat = restQuatsRef.current.get(joint.nodeName);
-        const restPos = restPosRef.current.get(joint.nodeName);
-        if (!restQuat || !restPos) continue;
+        const restQuat = robot.restQuats.get(joint.nodeName);
+        const restPosVec = robot.restPos.get(joint.nodeName);
+        if (!restQuat || !restPosVec) continue;
 
         let axis = jointAxisCacheRef.current.get(joint.nodeName);
         if (!axis) {
@@ -239,7 +226,7 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
           _tmpQuat.current.setFromAxisAngle(axis, joint.value);
           node.quaternion.copy(restQuat).multiply(_tmpQuat.current);
         } else {
-          node.position.copy(restPos).addScaledVector(axis, joint.value);
+          node.position.copy(restPosVec).addScaledVector(axis, joint.value);
         }
       }
     }
@@ -250,7 +237,7 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
     const zoomFactor = mapSettingsRef.current.zoom;
     const targetZ = lerp(0, robotWorldZ, zoomFactor);
     camTargetRef.current.lerp(
-      new THREE.Vector3(robotWorldX, 0.3, targetZ),
+      _tmpCamTarget.current.set(robotWorldX, 0.3, targetZ),
       dtLerp(LERP_POS, delta),
     );
 
@@ -273,7 +260,7 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
       // Driver mode: fixed from driver station end, based on alliance
       // Blue: drivers at -X end, looking toward +X → theta = 0
       // Red: drivers at +X end, looking toward -X → theta = π
-      const driverTheta = isRedAlliance ? -Math.PI*0.5 : Math.PI*0.5;
+      const driverTheta = (isRedAlliance ?? false) ? -Math.PI*0.5 : Math.PI*0.5;
       targetTheta = lerpAngle(camThetaRef.current, driverTheta, dtLerp(0.10, delta));
     }
 
@@ -305,7 +292,7 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
 
 // ── Root component ───────────────────────────────────────────────────────────
 interface MiniMap3DProps {
-  isRedAlliance: boolean;
+  isRedAlliance: boolean | null;
   matchPhase: MatchPhase;
 }
 
@@ -385,7 +372,9 @@ export function MiniMap3D(props: MiniMap3DProps) {
         frameloop="always"
         style={{ width: "100%", height: "100%", pointerEvents: "none" }}
       >
-        <MiniMap3DInner {...props} />
+        <Suspense fallback={null}>
+          <MiniMap3DInner {...props} />
+        </Suspense>
       </Canvas>
       {/* Static soft-edge vignette — painted once, not re-run per WebGL frame */}
       <div

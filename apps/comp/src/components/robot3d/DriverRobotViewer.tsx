@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -13,6 +13,10 @@ import { useSettings } from "@/lib/settings";
 
 const BUMPER_RED = new THREE.Color(0xdd1111);
 const BUMPER_BLUE = new THREE.Color(0x1111dd);
+
+// Singleton DRACOLoader — shared across all useLoader calls in this module
+const _dracoLoader = new DRACOLoader();
+_dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
 
 // ---------------------------------------------------------------------------
 // Tunable constants (adjust these to taste)
@@ -116,18 +120,13 @@ function DriverScene({
   modelUrl: string;
   jointsRef: React.RefObject<JointValue[]>;
   stateIndex: number;
-  isRedAlliance: boolean;
+  isRedAlliance: boolean | null;
 }) {
   const { camera, gl, scene, invalidate } = useThree();
   const perspCamera = camera as THREE.PerspectiveCamera;
 
   // Refs
   const controlsRef = useRef<OrbitControls | null>(null);
-  const sceneRootRef = useRef<THREE.Object3D | null>(null);
-  const restQuatsRef = useRef<Map<string, THREE.Quaternion>>(new Map());
-  const restPosRef = useRef<Map<string, THREE.Vector3>>(new Map());
-  const bumperMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
-  const jointNodeCacheRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const jointAxisCacheRef = useRef<Map<string, THREE.Vector3>>(new Map());
   const _tmpQuat = useRef(new THREE.Quaternion());
   const lastInputEndRef = useRef(performance.now());
@@ -194,51 +193,46 @@ function DriverScene({
     };
   }, [camera, gl.domElement]);
 
-  // ---- Load GLB model ----
-  useEffect(() => {
-    const draco = new DRACOLoader();
-    draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
-    const loader = new GLTFLoader();
-    loader.setDRACOLoader(draco);
+  // ---- Load GLB model (cached by useLoader) ----
+  const gltf = useLoader(GLTFLoader, modelUrl, (l) => l.setDRACOLoader(_dracoLoader));
 
-    loader.load(modelUrl, (gltf) => {
-      if (sceneRootRef.current) scene.remove(sceneRootRef.current);
+  // Clone the cached scene and derive per-instance data
+  const { clonedScene, nodeMap, restQuats, restPos, bumperMats } = useMemo(() => {
+    const clone = gltf.scene.clone(true);
+    clone.rotation.x = -Math.PI / 2;
 
-      bumperMatsRef.current = [];
-      jointNodeCacheRef.current.clear();
-      const bumperSet = new Set(rigConfig.bumperNodes);
-      // Capture rest transforms before any joint is applied
-      gltf.scene.traverse((node) => {
-        restQuatsRef.current.set(node.name, node.quaternion.clone());
-        restPosRef.current.set(node.name, node.position.clone());
-        if ((node as THREE.Mesh).isMesh && bumperSet.has(node.name)) {
-          const mesh = node as THREE.Mesh;
-          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-          for (const m of mats) {
-            if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-              const cloned = (m as THREE.MeshStandardMaterial).clone();
-              mesh.material = cloned;
-              bumperMatsRef.current.push(cloned);
-            }
+    const nodeMap = new Map<string, THREE.Object3D>();
+    const restQuats = new Map<string, THREE.Quaternion>();
+    const restPos = new Map<string, THREE.Vector3>();
+    const bumperMats: THREE.MeshStandardMaterial[] = [];
+    const bumperSet = new Set(rigConfig.bumperNodes);
+
+    clone.traverse((node) => {
+      nodeMap.set(node.name, node);
+      restQuats.set(node.name, node.quaternion.clone());
+      restPos.set(node.name, node.position.clone());
+
+      if ((node as THREE.Mesh).isMesh && bumperSet.has(node.name)) {
+        const mesh = node as THREE.Mesh;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const m of mats) {
+          if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+            const clonedMat = (m as THREE.MeshStandardMaterial).clone();
+            mesh.material = clonedMat;
+            bumperMats.push(clonedMat);
           }
         }
-      });
-
-      // Rotate from Z-up to Y-up
-      gltf.scene.rotation.x = -Math.PI / 2;
-      sceneRootRef.current = gltf.scene;
-      scene.add(gltf.scene);
+      }
     });
 
-    return () => {
-      if (sceneRootRef.current) {
-        scene.remove(sceneRootRef.current);
-        sceneRootRef.current = null;
-      }
-      draco.dispose();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelUrl]);
+    return { clonedScene: clone, nodeMap, restQuats, restPos, bumperMats };
+  }, [gltf.scene]);
+
+  // Attach/detach cloned scene
+  useEffect(() => {
+    scene.add(clonedScene);
+    return () => { scene.remove(clonedScene); };
+  }, [clonedScene, scene]);
 
   // Helper to start a spherical camera transition
   function startTransition(pose: CameraPose, duration: number) {
@@ -268,14 +262,17 @@ function DriverScene({
     isTransitioningRef.current = true;
   }
 
-  // ---- Recolor bumpers when alliance changes ----
+  // ---- Recolor bumpers when alliance changes (null = no value yet, keep model color) ----
   useEffect(() => {
+    if (isRedAlliance == null) return;
     const color = isRedAlliance ? BUMPER_RED : BUMPER_BLUE;
-    for (const mat of bumperMatsRef.current) {
-      mat.color.copy(color);
-    }
+    for (const mat of bumperMats) mat.color.copy(color);
     invalidate();
-  }, [isRedAlliance]);
+  }, [isRedAlliance, bumperMats]);
+
+  // ---- Invalidate on joint updates so demand rendering picks them up ----
+  const joints = jointsRef.current;
+  useEffect(() => { invalidate(); }, [joints]);
 
   // ---- State transition trigger ----
   useEffect(() => {
@@ -302,33 +299,25 @@ function DriverScene({
     if (!controls) return;
 
     // Apply joints
-    const root = sceneRootRef.current;
-    if (root) {
-      for (const joint of jointsRef.current ?? []) {
-        let node = jointNodeCacheRef.current.get(joint.nodeName);
-        if (!node) {
-          const found = root.getObjectByName(joint.nodeName);
-          if (!found) continue;
-          jointNodeCacheRef.current.set(joint.nodeName, found);
-          node = found;
-        }
+    for (const joint of jointsRef.current ?? []) {
+      const node = nodeMap.get(joint.nodeName);
+      if (!node) continue;
 
-        const restQuat = restQuatsRef.current.get(joint.nodeName);
-        const restP = restPosRef.current.get(joint.nodeName);
-        if (!restQuat || !restP) continue;
+      const restQuat = restQuats.get(joint.nodeName);
+      const restP = restPos.get(joint.nodeName);
+      if (!restQuat || !restP) continue;
 
-        let axis = jointAxisCacheRef.current.get(joint.nodeName);
-        if (!axis) {
-          axis = new THREE.Vector3(...joint.axis).normalize();
-          jointAxisCacheRef.current.set(joint.nodeName, axis);
-        }
+      let axis = jointAxisCacheRef.current.get(joint.nodeName);
+      if (!axis) {
+        axis = new THREE.Vector3(...joint.axis).normalize();
+        jointAxisCacheRef.current.set(joint.nodeName, axis);
+      }
 
-        if (joint.type === "revolute") {
-          _tmpQuat.current.setFromAxisAngle(axis, joint.value);
-          node.quaternion.copy(restQuat).multiply(_tmpQuat.current);
-        } else {
-          node.position.copy(restP).addScaledVector(axis, joint.value);
-        }
+      if (joint.type === "revolute") {
+        _tmpQuat.current.setFromAxisAngle(axis, joint.value);
+        node.quaternion.copy(restQuat).multiply(_tmpQuat.current);
+      } else {
+        node.position.copy(restP).addScaledVector(axis, joint.value);
       }
     }
 
@@ -413,13 +402,13 @@ export function DriverRobotViewer({
   modelUrl,
   jointsRef,
   stateIndex,
-  isRedAlliance = false,
+  isRedAlliance = null,
   isActive,
 }: {
   modelUrl: string;
   jointsRef: React.RefObject<JointValue[]>;
   stateIndex: number;
-  isRedAlliance?: boolean;
+  isRedAlliance?: boolean | null;
   isActive?: boolean;
 }) {
   const { visualSettings } = useSettings();
@@ -436,7 +425,9 @@ export function DriverRobotViewer({
       frameloop={isActive === false ? "never" : "always"}
       style={{ width: "100%", height: "100%", background: "#000" }}
     >
-      <DriverScene modelUrl={modelUrl} jointsRef={jointsRef} stateIndex={stateIndex} isRedAlliance={isRedAlliance} />
+      <Suspense fallback={null}>
+        <DriverScene modelUrl={modelUrl} jointsRef={jointsRef} stateIndex={stateIndex} isRedAlliance={isRedAlliance} />
+      </Suspense>
     </Canvas>
   );
 }

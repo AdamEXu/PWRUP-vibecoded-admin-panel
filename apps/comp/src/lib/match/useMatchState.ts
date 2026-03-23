@@ -71,13 +71,13 @@ function mapAimMode(mode: number): MatchState["aimMode"] {
   }
 }
 
-export function useIsRedAlliance(): boolean {
-  const { value } = useNTopic<boolean>(
+export function useIsRedAlliance(): boolean | null {
+  const { value, isConnected } = useNTopic<boolean>(
     NT.MATCH_HUD_IS_RED_ALLIANCE,
     NetworkTablesTypeInfos.kBoolean,
     true,
   );
-  return value;
+  return isConnected ? value : null;
 }
 
 export function useMatchState(): MatchState {
@@ -91,11 +91,12 @@ export function useMatchState(): MatchState {
     NetworkTablesTypeInfos.kBoolean,
     false,
   );
-  const { value: isRedAlliance } = useNTopic<boolean>(
+  const { value: isRedAllianceRaw, isConnected: allianceConnected } = useNTopic<boolean>(
     NT.MATCH_HUD_IS_RED_ALLIANCE,
     NetworkTablesTypeInfos.kBoolean,
     true,
   );
+  const isRedAlliance = allianceConnected ? isRedAllianceRaw : null;
   const { value: enabled } = useNTopic<boolean>(
     NT.MATCH_HUD_ENABLED,
     NetworkTablesTypeInfos.kBoolean,

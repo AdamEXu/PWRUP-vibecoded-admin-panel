@@ -6,6 +6,8 @@ import { CustomSelector, type SelectorOption } from "../components/panels/Custom
 import { CustomSlider, type SliderHintRange } from "../components/panels/CustomSlider";
 import { SettingsColumn } from "../settings/components/SettingsColumn";
 
+const CAD_ASSET_URLS = ["/cad/Robot-Full.glb", "/cad/field-2026.glb?v=2"];
+
 export const VISUAL_RELOAD_CHANNEL = "pwrup-visual-settings-reload";
 
 const LOG_DEPTH_OPTIONS: SelectorOption[] = [
@@ -40,6 +42,16 @@ function broadcastReload() {
 export function VisualTab() {
   const { visualSettings, updateVisualSettings, resetVisualSettings } = useSettings();
   const [draft, setDraft] = useState<VisualSettings>(() => visualSettings);
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  async function clearCacheAndReload() {
+    setIsClearingCache(true);
+    try {
+      await Promise.all(CAD_ASSET_URLS.map((url) => fetch(url, { cache: "reload" })));
+    } catch { /* ignore — still reload */ }
+    broadcastReload();
+    window.location.reload();
+  }
 
   useEffect(() => {
     setDraft(visualSettings);
@@ -104,6 +116,22 @@ export function VisualTab() {
             snapPoints={RENDER_SCALE_SNAP_POINTS}
             hints={RENDER_SCALE_HINTS}
           />
+        </SettingsColumn>
+
+        <SettingsColumn title="Assets">
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-zinc-400">
+              Force-refetch 3D models so a new robot CAD is picked up without waiting for the 24h browser cache to expire.
+            </p>
+            <button
+              type="button"
+              onClick={() => void clearCacheAndReload()}
+              disabled={isClearingCache}
+              className="h-12 border-2 border-white/20 bg-transparent px-6 text-sm font-semibold text-zinc-400 transition-colors hover:bg-white/5 active:bg-white/10 disabled:opacity-50"
+            >
+              {isClearingCache ? "Clearing…" : "Clear Cache & Hard Refresh"}
+            </button>
+          </div>
         </SettingsColumn>
       </div>
     </div>
