@@ -55,12 +55,12 @@ export function PathDetailPane({
     <>
       <div className="flex h-full w-1/2 shrink-0 flex-col justify-between p-[16px]">
         <div className="flex flex-col gap-[10px] text-white">
-          <p className="text-[34px] leading-[1] font-semibold">{displayName ?? viewingEntry.name}</p>
+          <div>
+            <p className="text-[34px] leading-[1] font-semibold">{displayName ?? viewingEntry.name}</p>
+            <p className="mt-[4px] text-[16px] leading-[1.3] text-zinc-500">{viewingEntry.fileName}</p>
+          </div>
           {description && (
             <p className="max-w-[660px] text-[22px] leading-[1.2] text-white">{description}</p>
-          )}
-          {!description && (
-            <p className="text-[22px] leading-[1.2] text-zinc-300">{viewingEntry.fileName}</p>
           )}
         </div>
 

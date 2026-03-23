@@ -42,6 +42,7 @@ export function PathListPane({
         <PathCard
           key={entry.fileName}
           displayName={metadataByPathName[entry.name]?.name ?? entry.name}
+          fileName={entry.fileName}
           description={metadataByPathName[entry.name]?.description}
           isActive={activePathName === entry.name}
           isViewing={viewingPathName === entry.name}
