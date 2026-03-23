@@ -380,7 +380,7 @@ async function createAppWindow(options) {
 async function createWindows() {
   if (!mainWindow) {
     mainWindow = await createAppWindow({
-      routePath: "/",
+      routePath: "/hud",
       width: 1440,
       height: 900,
       minWidth: 1024,

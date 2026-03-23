@@ -3,8 +3,8 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "PWRUP Match HUD",
-  description: "PWRUP Competition Match Display",
+  title: "PWRUP Comp",
+  description: "PWRUP Competition Display App",
 };
 
 export default function RootLayout({
