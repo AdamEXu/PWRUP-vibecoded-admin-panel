@@ -117,7 +117,7 @@ function DriverScene({
   stateIndex: number;
   isRedAlliance: boolean;
 }) {
-  const { camera, gl, scene } = useThree();
+  const { camera, gl, scene, invalidate } = useThree();
   const perspCamera = camera as THREE.PerspectiveCamera;
 
   // Refs
@@ -131,6 +131,7 @@ function DriverScene({
   const idleTriggeredRef = useRef(false);
   const isTransitioningRef = useRef(false);
   const transitionRef = useRef<TransitionState | null>(null);
+  const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTargetRef = useRef<CameraPose>({
     position: cameraPoses.initial.position as Vec3Tuple,
     target: cameraPoses.initial.target as Vec3Tuple,
@@ -154,9 +155,11 @@ function DriverScene({
     // Set initial target
     controls.target.set(...(cameraPoses.initial.target as Vec3Tuple));
 
+    const onChange = () => { invalidate(); };
     const onStart = () => {
       isDraggingRef.current = true;
       idleTriggeredRef.current = false;
+      if (idleTimeoutRef.current) { clearTimeout(idleTimeoutRef.current); idleTimeoutRef.current = null; }
       // Cancel any active idle-return transition
       if (isTransitioningRef.current) {
         isTransitioningRef.current = false;
@@ -167,13 +170,19 @@ function DriverScene({
       isDraggingRef.current = false;
       lastInputEndRef.current = performance.now();
       idleTriggeredRef.current = false;
+      // Schedule a frame after idle timeout so useFrame can trigger the idle-return transition
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+      idleTimeoutRef.current = setTimeout(() => { invalidate(); }, IDLE_TIMEOUT_MS + 50);
     };
 
+    controls.addEventListener("change", onChange);
     controls.addEventListener("start", onStart);
     controls.addEventListener("end", onEnd);
 
     controlsRef.current = controls;
     return () => {
+      if (idleTimeoutRef.current) { clearTimeout(idleTimeoutRef.current); idleTimeoutRef.current = null; }
+      controls.removeEventListener("change", onChange);
       controls.removeEventListener("start", onStart);
       controls.removeEventListener("end", onEnd);
       controls.dispose();
@@ -260,7 +269,11 @@ function DriverScene({
     for (const mat of bumperMatsRef.current) {
       mat.color.copy(color);
     }
+    invalidate();
   }, [isRedAlliance]);
+
+  // ---- Invalidate on joint updates so demand rendering picks them up ----
+  useEffect(() => { invalidate(); }, [joints]);
 
   // ---- State transition trigger ----
   useEffect(() => {
@@ -277,6 +290,7 @@ function DriverScene({
     };
     startTransition(targetPose, TRANSITION_DURATION_MS);
     idleTriggeredRef.current = false;
+    invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateIndex]);
 
@@ -365,6 +379,9 @@ function DriverScene({
     }
 
     controls.update();
+
+    // With frameloop="demand", keep requesting frames while animating
+    if (isTransitioningRef.current) invalidate();
   });
 
   return (
@@ -403,7 +420,7 @@ export function DriverRobotViewer({
         far: 50,
       }}
       gl={{ antialias: true }}
-      frameloop={isActive === false ? "never" : "always"}
+      frameloop={isActive === false ? "never" : "demand"}
       style={{ width: "100%", height: "100%", background: "#000" }}
     >
       <DriverScene modelUrl={modelUrl} joints={joints} stateIndex={stateIndex} isRedAlliance={isRedAlliance} />
