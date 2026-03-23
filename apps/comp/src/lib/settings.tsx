@@ -34,7 +34,6 @@ function loadMapSettings(): MapSettings {
       mode: parsed.mode === "follow" || parsed.mode === "driver" ? parsed.mode : DEFAULT_MAP_SETTINGS.mode,
       angle: typeof parsed.angle === "number" && isFinite(parsed.angle) ? Math.max(0, Math.min(1, parsed.angle)) : DEFAULT_MAP_SETTINGS.angle,
       zoom: typeof parsed.zoom === "number" && isFinite(parsed.zoom) ? Math.max(0, Math.min(1, parsed.zoom)) : DEFAULT_MAP_SETTINGS.zoom,
-      disableIdle: typeof parsed.disableIdle === "boolean" ? parsed.disableIdle : DEFAULT_MAP_SETTINGS.disableIdle,
     };
   } catch {
     return DEFAULT_MAP_SETTINGS;
@@ -234,7 +233,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         mode: parsed?.mode === "follow" || parsed?.mode === "driver" ? parsed.mode : mapSettingsRef.current.mode,
         angle: typeof parsed?.angle === "number" && isFinite(parsed.angle) ? Math.max(0, Math.min(1, parsed.angle)) : mapSettingsRef.current.angle,
         zoom: typeof parsed?.zoom === "number" && isFinite(parsed.zoom) ? Math.max(0, Math.min(1, parsed.zoom)) : mapSettingsRef.current.zoom,
-        disableIdle: typeof parsed?.disableIdle === "boolean" ? parsed.disableIdle : mapSettingsRef.current.disableIdle,
       };
       mapSettingsRef.current = next;
       setMapSettingsState(next);

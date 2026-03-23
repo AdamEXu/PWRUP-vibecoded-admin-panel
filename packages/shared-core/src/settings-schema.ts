@@ -22,6 +22,7 @@ export interface MapSettings {
   mode: 'follow' | 'driver';
   angle: number; // 0–1, 0 = top-down, 1 = level with robot
   zoom: number;  // 0–1, 0 = far, 1 = close
+  // Idle behavior is always enabled (no longer configurable)
 }
 
 export interface SharedSettingsPayload {

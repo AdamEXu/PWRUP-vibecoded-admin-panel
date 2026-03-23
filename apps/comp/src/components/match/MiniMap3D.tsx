@@ -5,10 +5,13 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import * as THREE from "three";
+import { NetworkTablesTypeInfos } from "ntcore-ts-client";
 import { useSettings } from "@/lib/settings";
 import { useRobotJoints } from "@/components/robot3d/useRobotJoints";
 import type { JointValue } from "@/components/robot3d/RobotViewer";
 import type { MatchPhase } from "@/lib/match/types";
+import { NT } from "@/lib/match/constants";
+import { hasBridge, subscribeNtTopic } from "@/lib/blitzRenderer";
 import fieldMeta from "../../../public/cad/field-meta.json";
 import rigConfig from "../../../public/cad/robot-rig.json";
 
@@ -33,11 +36,6 @@ const POLAR_LOW = 1.35;  // nearly level
 // Lerp rates (normalized to 60fps; delta-time corrected via dtLerp)
 const LERP_POS = 0.15;   // robot position follow
 const LERP_THETA = 0.10; // follow-mode azimuth
-const LERP_CAM = 0.10;   // idle camera transition
-// Idle/showcase camera parameters
-
-const IDLE_AZIMUTH_SPEED = 0.0; // static (no orbit in idle for now)
-const IDLE_THETA_OFFSET = Math.PI * 0.75; // offset so camera isn't directly behind
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
@@ -152,18 +150,14 @@ function useGLTFModel(url: string, useWrapper = false, bumperNodeNames: string[]
 
 // ── Scene component ─────────────────────────────────────────────────────────
 interface SceneProps {
-  poseX: number;
-  poseY: number;
-  heading: number;
+  poseRef: React.RefObject<{ x: number; y: number; heading: number }>;
+  jointValuesRef: React.RefObject<JointValue[]>;
   isRedAlliance: boolean;
-  matchPhase: MatchPhase;
-  joints: JointValue[];
 }
 
-function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: SceneProps) {
+function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
   const { camera } = useThree();
   const { mapSettings } = useSettings();
-  const isIdle = !mapSettings.disableIdle && (matchPhase === "pre_match" || matchPhase === "post_match");
 
   // Load field (static) — rootRef keeps it attached to the scene
   useGLTFModel(FIELD_URL);
@@ -186,11 +180,13 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
   // Three.js: center field at origin, Z = WPILib Y - half
   const HALF_W = 8.27;
   const HALF_H = 4.105;
-  const robotWorldX = HALF_W - poseX; // negated: red at +X, blue at -X
-  const robotWorldZ = poseY - HALF_H;
 
   // Smooth camera target (robot position, lerped)
-  const camTargetRef = useRef(new THREE.Vector3(robotWorldX, 0, robotWorldZ));
+  const camTargetRef = useRef(new THREE.Vector3(
+    HALF_W - poseRef.current.x,
+    0,
+    poseRef.current.y - HALF_H,
+  ));
   // Smooth camera azimuth theta
   const camThetaRef = useRef(0);
   // Current camera spherical
@@ -206,6 +202,11 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
     const wrapper = robotRef.current;
     const inner = robotInnerRef.current;
 
+    // Read latest pose + joints directly from refs — no React render cycle needed.
+    const { x: poseX, y: poseY, heading } = poseRef.current;
+    const robotWorldX = HALF_W - poseX;
+    const robotWorldZ = poseY - HALF_H;
+
     // ── Robot position + heading on the wrapper group ─────────────────
     if (wrapper) {
       wrapper.position.set(robotWorldX, 0, robotWorldZ);
@@ -216,7 +217,7 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
 
     // ── Apply joints on the inner scene (which has the Z-up→Y-up rotation) ──
     if (inner) {
-      for (const joint of joints) {
+      for (const joint of jointValuesRef.current) {
         const node = inner.getObjectByName(joint.nodeName);
         if (!node) continue;
         const restQuat = restQuatsRef.current.get(joint.nodeName);
@@ -253,23 +254,18 @@ function Scene({ poseX, poseY, heading, isRedAlliance, matchPhase, joints }: Sce
 
     let targetTheta: number;
 
-    if (isIdle) {
-      // Showcase: fixed pleasant azimuth only; angle/zoom still follow sliders
-      targetTheta = lerpAngle(camThetaRef.current, IDLE_THETA_OFFSET, dtLerp(LERP_CAM, delta));
+    // Idle behavior disabled - always use active mode camera
+    if (mapSettings.mode === "follow") {
+      // Camera is behind robot (climber side): robot heading points toward intake
+      // With negated X and model default forward +worldZ: camera behind = heading + π/2
+      const desiredTheta = heading + Math.PI / 2;
+      targetTheta = lerpAngle(camThetaRef.current, desiredTheta, dtLerp(LERP_THETA, delta));
     } else {
-
-      if (mapSettings.mode === "follow") {
-        // Camera is behind robot (climber side): robot heading points toward intake
-        // With negated X and model default forward +worldZ: camera behind = heading + π/2
-        const desiredTheta = heading + Math.PI / 2;
-        targetTheta = lerpAngle(camThetaRef.current, desiredTheta, dtLerp(LERP_THETA, delta));
-      } else {
-        // Driver mode: fixed from driver station end, based on alliance
-        // Blue: drivers at -X end, looking toward +X → theta = 0
-        // Red: drivers at +X end, looking toward -X → theta = π
-        const driverTheta = isRedAlliance ? -Math.PI*0.5 : Math.PI*0.5;
-        targetTheta = lerpAngle(camThetaRef.current, driverTheta, dtLerp(0.10, delta));
-      }
+      // Driver mode: fixed from driver station end, based on alliance
+      // Blue: drivers at -X end, looking toward +X → theta = 0
+      // Red: drivers at +X end, looking toward -X → theta = π
+      const driverTheta = isRedAlliance ? -Math.PI*0.5 : Math.PI*0.5;
+      targetTheta = lerpAngle(camThetaRef.current, driverTheta, dtLerp(0.10, delta));
     }
 
     camThetaRef.current = targetTheta;
@@ -308,16 +304,45 @@ interface MiniMap3DProps {
 }
 
 function MiniMap3DInner(props: MiniMap3DProps) {
-  const { jointValues } = useRobotJoints();
+  const { jointValuesRef } = useRobotJoints();
+
+  // Subscribe to pose topics directly — values land in a ref so useFrame
+  // picks them up on the very next animation frame without a React re-render.
+  const poseRef = useRef({ x: props.poseX, y: props.poseY, heading: props.heading });
+
+  useEffect(() => {
+    if (!hasBridge()) return;
+
+    let disposed = false;
+    const cleanups: Array<() => void> = [];
+
+    const sub = (topic: string, apply: (v: number) => void) => {
+      void subscribeNtTopic<number>(
+        { topicPath: topic, typeInfo: NetworkTablesTypeInfos.kDouble, defaultValue: 0 },
+        (update) => {
+          if (!disposed && update.hasValue) apply(Number(update.value));
+        },
+      ).then((cleanup) => {
+        if (disposed) cleanup();
+        else cleanups.push(cleanup);
+      });
+    };
+
+    sub(NT.MATCH_HUD_POSE_X,  (v) => { poseRef.current = { ...poseRef.current, x: v }; });
+    sub(NT.MATCH_HUD_POSE_Y,  (v) => { poseRef.current = { ...poseRef.current, y: v }; });
+    sub(NT.MATCH_HUD_HEADING, (v) => { poseRef.current = { ...poseRef.current, heading: v }; });
+
+    return () => {
+      disposed = true;
+      cleanups.forEach((c) => c());
+    };
+  }, []);
 
   return (
     <Scene
-      poseX={props.poseX}
-      poseY={props.poseY}
-      heading={props.heading}
+      poseRef={poseRef}
+      jointValuesRef={jointValuesRef}
       isRedAlliance={props.isRedAlliance}
-      matchPhase={props.matchPhase}
-      joints={jointValues}
     />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NetworkTablesTypeInfos } from "ntcore-ts-client";
 import type { JointValue } from "@/components/robot3d/RobotViewer";
 import { hasBridge, subscribeNtTopic } from "@/lib/blitzRenderer";
@@ -55,8 +55,39 @@ function transformNtValue(joint: RigJoint, rawValue: number): number {
   return clampJointValue(joint, nextValue);
 }
 
+// Module-level compute — used both in the React render path (useMemo) and
+// the hot NT-callback path (ref update) so the logic stays in one place.
+function computeJointValues(
+  ntVals: Record<string, NtJointState>,
+  manualVals: Record<string, number>,
+): JointValue[] {
+  const resolved: Record<string, number> = {};
+
+  Object.entries(joints).forEach(([key, joint]) => {
+    if (joint.link) return;
+    const ntState = ntVals[key];
+    const hasLiveNtValue = Boolean(joint.ntTopic && ntState?.isConnected && ntState.hasValue);
+    const fallbackValue = manualVals[key] ?? joint.defaultValue ?? 0;
+    resolved[key] = clampJointValue(joint, hasLiveNtValue ? ntState.value : fallbackValue);
+  });
+
+  Object.entries(joints).forEach(([key, joint]) => {
+    if (!joint.link) return;
+    const sourceValue = resolved[joint.link.source] ?? 0;
+    resolved[key] = clampJointValue(joint, sourceValue * joint.link.scale + joint.link.offset);
+  });
+
+  return renderedJoints.map(([key, joint]) => ({
+    nodeName: joint.nodeName,
+    axis: joint.axis,
+    type: joint.type,
+    value: resolved[key] ?? joint.defaultValue ?? 0,
+  }));
+}
+
 export interface RobotJointsResult {
   jointValues: JointValue[];
+  jointValuesRef: React.RefObject<JointValue[]>;
   resolvedValues: Record<string, number>;
   liveNtByJoint: Record<string, boolean>;
   manualValues: Record<string, number>;
@@ -69,6 +100,18 @@ export function useRobotJoints(): RobotJointsResult {
     Object.fromEntries(primaryJoints.map(([key, j]) => [key, j.defaultValue ?? 0])),
   );
   const [ntValues, setNtValues] = useState<Record<string, NtJointState>>({});
+
+  // Refs for the hot render path — updated synchronously in NT callbacks,
+  // so useFrame always sees the latest values without waiting for a React re-render.
+  const ntValuesRef = useRef<Record<string, NtJointState>>({});
+  const manualValuesRef = useRef(manualValues);
+  const jointValuesRef = useRef<JointValue[]>([]);
+  manualValuesRef.current = manualValues; // kept fresh on every render
+
+  // When manual slider values change, recompute the ref immediately.
+  useEffect(() => {
+    jointValuesRef.current = computeJointValues(ntValuesRef.current, manualValues);
+  }, [manualValues]);
 
   useEffect(() => {
     if (!bridgeAvailable) {
@@ -100,18 +143,20 @@ export function useRobotJoints(): RobotJointsResult {
           defaultValue: 0,
         },
         (update) => {
-          if (disposed) {
-            return;
-          }
+          if (disposed) return;
 
-          setNtValues((prev) => ({
-            ...prev,
-            [key]: {
-              value: transformNtValue(joint, Number(update.value)),
-              hasValue: update.hasValue,
-              isConnected: update.isConnected,
-            },
-          }));
+          const newState: NtJointState = {
+            value: transformNtValue(joint, Number(update.value)),
+            hasValue: update.hasValue,
+            isConnected: update.isConnected,
+          };
+
+          // Hot path: update refs immediately — no React render cycle needed.
+          ntValuesRef.current = { ...ntValuesRef.current, [key]: newState };
+          jointValuesRef.current = computeJointValues(ntValuesRef.current, manualValuesRef.current);
+
+          // Also update React state so debug UI stays in sync.
+          setNtValues((prev) => ({ ...prev, [key]: newState }));
         },
       ).then((cleanup) => {
         if (disposed) {
@@ -181,5 +226,5 @@ export function useRobotJoints(): RobotJointsResult {
     [resolvedValues],
   );
 
-  return { jointValues, resolvedValues, liveNtByJoint, manualValues, setManualValues };
+  return { jointValues, jointValuesRef, resolvedValues, liveNtByJoint, manualValues, setManualValues };
 }

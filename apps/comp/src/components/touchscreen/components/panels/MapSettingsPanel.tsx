@@ -10,11 +10,6 @@ const MODE_OPTIONS: SelectorOption[] = [
   { id: "follow", symbol: "􀎭" },
 ];
 
-const IDLE_OPTIONS: SelectorOption[] = [
-  { id: "false", symbol: "􀆅" },
-  { id: "true",  symbol: "􀆄" },
-];
-
 export function MapSettingsPanel() {
   const { mapSettings, updateMapSettings, resetMapSettings } = useSettings();
 
@@ -30,13 +25,6 @@ export function MapSettingsPanel() {
           options={MODE_OPTIONS}
           value={mapSettings.mode}
           onChange={(id) => updateMapSettings({ mode: id as "follow" | "driver" })}
-        />
-
-        <CustomSelector
-          label="Idle Position"
-          options={IDLE_OPTIONS}
-          value={mapSettings.disableIdle ? "true" : "false"}
-          onChange={(id) => updateMapSettings({ disableIdle: id === "true" })}
         />
 
         <CustomSlider
