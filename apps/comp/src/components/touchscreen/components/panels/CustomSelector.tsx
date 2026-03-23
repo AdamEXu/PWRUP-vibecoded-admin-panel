@@ -6,6 +6,7 @@ export interface SelectorOption {
   id: string;
   symbol: string;       // unfilled SF Symbol character
   filledSymbol?: string; // filled variant, used in the selected state
+  hint?: string;
 }
 
 interface CustomSelectorProps {
@@ -225,6 +226,11 @@ export function CustomSelector({ options, value, onChange, label }: CustomSelect
           ))}
         </div>
       </div>
+      {(() => {
+        const displayIndex = isDragging ? xToIndex(greenX) : effectiveIndex;
+        const hint = options[displayIndex]?.hint;
+        return hint ? <p>{hint}</p> : null;
+      })()}
     </div>
   );
 }
