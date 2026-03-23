@@ -355,6 +355,16 @@ function MiniMap3DInner(props: MiniMap3DProps) {
 
 export function MiniMap3D(props: MiniMap3DProps) {
   const { visualSettings } = useSettings();
+  // border-radius: 30% 30% 0 0 reproduces rx='60' on a 200-unit viewBox with
+  // preserveAspectRatio='none' (60/200 = 30% of each axis). Bottom corners are 0
+  // because the original SVG rect extended past the viewBox (height=220 on 200px
+  // viewBox), so the bottom was never rounded.
+  //
+  // The inset box-shadow overlay replaces feGaussianBlur (stdDeviation=10 on 200
+  // viewBox = ~15% feathering = ~6vw at 1920px). It is painted once as a static
+  // CSS layer, not re-composited per WebGL frame like the SVG mask was.
+  // The background behind the minimap is always black, so fade-to-transparent and
+  // fade-to-black are visually identical.
   return (
     <div
       className="fixed"
@@ -362,12 +372,10 @@ export function MiniMap3D(props: MiniMap3DProps) {
         left: "28.125vw",
         top: "44.44vh",
         width: "43.75vw",
-        bottom: 0,
+        bottom: "-1vw",
         pointerEvents: "none",
-        maskImage: "url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><defs><filter id='s'><feGaussianBlur stdDeviation='10'/></filter></defs><rect x='14' y='10' width='172' height='220' rx='60' fill='white' filter='url(%23s)'/></svg>\")",
-        WebkitMaskImage: "url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><defs><filter id='s'><feGaussianBlur stdDeviation='10'/></filter></defs><rect x='14' y='10' width='172' height='220' rx='60' fill='white' filter='url(%23s)'/></svg>\")",
-        maskSize: "100% 100%",
-        WebkitMaskSize: "100% 100%",
+        borderRadius: "30% 30% 0 0",
+        overflow: "hidden",
       }}
     >
       <Canvas
@@ -379,6 +387,16 @@ export function MiniMap3D(props: MiniMap3DProps) {
       >
         <MiniMap3DInner {...props} />
       </Canvas>
+      {/* Static soft-edge vignette — painted once, not re-run per WebGL frame */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          borderRadius: "30% 30% 0 0",
+          boxShadow: "inset 0 0 5vw 3.5vw black",
+        }}
+      />
     </div>
   );
 }
