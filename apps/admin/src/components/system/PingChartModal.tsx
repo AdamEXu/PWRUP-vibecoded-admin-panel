@@ -130,7 +130,7 @@ export function PingChartModal({
                     borderRadius: "6px",
                     color: "#f3f4f6",
                   }}
-                  formatter={(value: number) => [`${value}ms`, "Ping"]}
+                  formatter={(value) => [`${value ?? ""}ms`, "Ping"]}
                 />
                 <Area
                   type="monotone"

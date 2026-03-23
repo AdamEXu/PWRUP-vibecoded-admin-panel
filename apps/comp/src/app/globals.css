@@ -14,8 +14,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: local("Roboto Mono"), local("RobotoMono-Regular"),
-    url("/fonts/RobotoMono-Regular.woff2") format("woff2");
+  src: local("Roboto Mono"), local("RobotoMono-Regular");
 }
 
 @font-face {
