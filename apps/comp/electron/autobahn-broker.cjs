@@ -45,6 +45,8 @@ class AutobahnBroker extends EventEmitter {
     this.clientKey = "";
     this.isConnected = false;
     this.statusPollHandle = null;
+    this.retryDelay = 2000;
+    this.retryHandle = null;
     this.nextSubscriptionId = 1;
     this.subscriptions = new Map();
     this.topicEntries = new Map();
@@ -144,6 +146,15 @@ class AutobahnBroker extends EventEmitter {
     this.client.publish(params.topic, payload);
   }
 
+  reconnect() {
+    this.retryDelay = 2000;
+    if (this.retryHandle) {
+      clearTimeout(this.retryHandle);
+      this.retryHandle = null;
+    }
+    this.#attemptReconnect();
+  }
+
   stop() {
     this.topicEntries.forEach((entry) => {
       if (!this.client) return;
@@ -156,6 +167,11 @@ class AutobahnBroker extends EventEmitter {
     this.topicEntries.clear();
     this.subscriptions.clear();
 
+    if (this.retryHandle) {
+      clearTimeout(this.retryHandle);
+      this.retryHandle = null;
+    }
+
     if (this.statusPollHandle) {
       clearInterval(this.statusPollHandle);
       this.statusPollHandle = null;
@@ -164,6 +180,17 @@ class AutobahnBroker extends EventEmitter {
     this.client = null;
     this.clientKey = "";
     this.#setConnectionState(false);
+  }
+
+  #attemptReconnect() {
+    if (this.statusPollHandle) {
+      clearInterval(this.statusPollHandle);
+      this.statusPollHandle = null;
+    }
+    this.client = null;
+    this.clientKey = "";
+    this.#ensureClient();
+    this.topicEntries.forEach((entry) => this.#bindTopicEntry(entry));
   }
 
   #ensureClient() {
@@ -194,6 +221,12 @@ class AutobahnBroker extends EventEmitter {
       this.#setConnectionState(false);
     }
 
+    this.retryDelay = 2000;
+    if (this.retryHandle) {
+      clearTimeout(this.retryHandle);
+      this.retryHandle = null;
+    }
+
     this.statusPollHandle = setInterval(() => {
       let connected = false;
       try {
@@ -202,6 +235,20 @@ class AutobahnBroker extends EventEmitter {
         connected = false;
       }
       this.#setConnectionState(connected);
+
+      if (connected) {
+        this.retryDelay = 2000;
+        if (this.retryHandle) {
+          clearTimeout(this.retryHandle);
+          this.retryHandle = null;
+        }
+      } else if (!this.retryHandle) {
+        this.retryHandle = setTimeout(() => {
+          this.retryHandle = null;
+          this.#attemptReconnect();
+        }, this.retryDelay);
+        this.retryDelay = Math.min(this.retryDelay * 2, 30_000);
+      }
     }, 250);
     this.statusPollHandle.unref?.();
   }

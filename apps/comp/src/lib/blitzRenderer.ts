@@ -65,6 +65,7 @@ export interface BlitzRendererBridge {
     ) => Promise<number>;
     unsubscribeTopic: (subscriptionId: number) => Promise<void>;
     publish: (params: { topic: string; payload: Uint8Array | ArrayBuffer }) => Promise<void>;
+    reconnect: () => Promise<void>;
   };
 }
 

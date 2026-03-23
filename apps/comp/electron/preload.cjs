@@ -101,5 +101,6 @@ contextBridge.exposeInMainWorld("blitzRenderer", {
       await ipcRenderer.invoke("blitz:autobahn:unsubscribe", subscriptionId);
     },
     publish: (params) => ipcRenderer.invoke("blitz:autobahn:publish", params),
+    reconnect: () => ipcRenderer.invoke("blitz:autobahn:reconnect"),
   },
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { getBridge, hasBridge, subscribeAutobahnStatus } from "@/lib/blitzRenderer";
 import { NetworkTablesPreview } from "./settings/components/NetworkTablesPreview";
 import { SettingsColumn } from "./settings/components/SettingsColumn";
 import { SettingsField } from "./settings/components/SettingsField";
@@ -26,9 +28,46 @@ export function TouchscreenSettingsPanel() {
     sharedTable,
   } = useTouchscreenSettingsForm();
 
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    if (!hasBridge()) return;
+
+    let disposed = false;
+    const unsubscribe = subscribeAutobahnStatus((connected) => {
+      if (!disposed) setIsConnected(connected);
+    });
+
+    void getBridge()
+      .autobahn.getStatus()
+      .then((connected) => {
+        if (!disposed) setIsConnected(connected);
+      })
+      .catch(() => {
+        if (!disposed) setIsConnected(false);
+      });
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, []);
+
+  function onReconnect() {
+    if (hasBridge()) {
+      void getBridge().autobahn.reconnect().catch(() => {});
+    }
+  }
+
   return (
     <div className="flex h-full flex-col bg-[#272727]">
-      <SettingsHeader onReset={onReset} onSave={onSave} canSave={saveEnabled} />
+      <SettingsHeader
+        onReset={onReset}
+        onSave={onSave}
+        onReconnect={onReconnect}
+        canSave={saveEnabled}
+        isConnected={isConnected}
+      />
 
       <div
         className={[

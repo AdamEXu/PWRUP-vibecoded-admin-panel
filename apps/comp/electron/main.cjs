@@ -247,6 +247,7 @@ function registerIpcHandlers() {
     autobahnBroker.unsubscribe(subscriptionId);
   });
   ipcMain.handle("blitz:autobahn:publish", (_event, params) => autobahnBroker.publish(params));
+  ipcMain.handle("blitz:autobahn:reconnect", () => autobahnBroker.reconnect());
 }
 
 async function initializeBridge() {
