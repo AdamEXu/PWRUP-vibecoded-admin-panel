@@ -13,6 +13,8 @@ import {
   DEFAULTS,
   DEFAULT_HUD_VISIBILITY,
   DEFAULT_MAP_SETTINGS,
+  DEFAULT_VISUAL_SETTINGS,
+  normalizeRenderScale,
   frcTeamToRobotIp,
   ntPathFromTableAndEntry,
   ntSelectedPathTopics,
@@ -20,6 +22,7 @@ import {
   type HudVisibilitySettings,
   type MapSettings,
   type SharedSettingsPayload,
+  type VisualSettings,
 } from "./settings-schema";
 
 interface SettingsContextValue {
@@ -33,6 +36,9 @@ interface SettingsContextValue {
   mapSettings: MapSettings;
   updateMapSettings: (patch: Partial<MapSettings>) => void;
   resetMapSettings: () => void;
+  visualSettings: VisualSettings;
+  updateVisualSettings: (patch: Partial<VisualSettings>) => void;
+  resetVisualSettings: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
@@ -152,6 +158,20 @@ function normalizeHudVisibility(parsed: Partial<HudVisibilitySettings> | undefin
   };
 }
 
+function normalizeVisualSettings(parsed: Partial<VisualSettings> | undefined): VisualSettings {
+  return {
+    logarithmicDepthBuffer:
+      typeof parsed?.logarithmicDepthBuffer === "boolean"
+        ? parsed.logarithmicDepthBuffer
+        : DEFAULT_VISUAL_SETTINGS.logarithmicDepthBuffer,
+    backdropBlur:
+      typeof parsed?.backdropBlur === "boolean"
+        ? parsed.backdropBlur
+        : DEFAULT_VISUAL_SETTINGS.backdropBlur,
+    renderScale: normalizeRenderScale(parsed?.renderScale),
+  };
+}
+
 function normalizeMapSettings(parsed: Partial<MapSettings> | undefined): MapSettings {
   return {
     mode: parsed?.mode === 'follow' || parsed?.mode === 'driver' ? parsed.mode : DEFAULT_MAP_SETTINGS.mode,
@@ -171,9 +191,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [hudVisibility, setHudVisibilityState] =
     useState<HudVisibilitySettings>(DEFAULT_HUD_VISIBILITY);
   const [mapSettings, setMapSettingsState] = useState<MapSettings>(DEFAULT_MAP_SETTINGS);
+  const [visualSettings, setVisualSettingsState] = useState<VisualSettings>(DEFAULT_VISUAL_SETTINGS);
   const versionRef = useRef(0);
   const hudVisibilityRef = useRef<HudVisibilitySettings>(DEFAULT_HUD_VISIBILITY);
   const mapSettingsRef = useRef<MapSettings>(DEFAULT_MAP_SETTINGS);
+  const visualSettingsRef = useRef<VisualSettings>(DEFAULT_VISUAL_SETTINGS);
 
   const applyPayload = useCallback((payload: SharedSettingsPayload) => {
     versionRef.current = payload.version;
@@ -184,6 +206,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const nextMapSettings = normalizeMapSettings(payload.mapSettings);
     mapSettingsRef.current = nextMapSettings;
     setMapSettingsState(nextMapSettings);
+    const nextVisualSettings = normalizeVisualSettings(payload.visualSettings);
+    visualSettingsRef.current = nextVisualSettings;
+    setVisualSettingsState(nextVisualSettings);
   }, []);
 
   const fetchSharedSettings = useCallback(async () => {
@@ -200,6 +225,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       settings?: ConnectionSettings;
       hudVisibility?: HudVisibilitySettings;
       mapSettings?: MapSettings;
+      visualSettings?: VisualSettings;
     }) => {
       const response = await fetch("/api/settings/connection", {
         method: "PUT",
@@ -313,6 +339,29 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setMapSettings(DEFAULT_MAP_SETTINGS);
   }, [setMapSettings]);
 
+  const setVisualSettings = useCallback(
+    (next: VisualSettings) => {
+      const normalized = normalizeVisualSettings(next);
+      visualSettingsRef.current = normalized;
+      setVisualSettingsState(normalized);
+      void persistSharedState({ visualSettings: normalized }).catch(() => {
+        void fetchSharedSettings().catch(() => {});
+      });
+    },
+    [fetchSharedSettings, persistSharedState],
+  );
+
+  const updateVisualSettings = useCallback(
+    (patch: Partial<VisualSettings>) => {
+      setVisualSettings({ ...visualSettingsRef.current, ...patch });
+    },
+    [setVisualSettings],
+  );
+
+  const resetVisualSettings = useCallback(() => {
+    setVisualSettings(DEFAULT_VISUAL_SETTINGS);
+  }, [setVisualSettings]);
+
   const value = useMemo<SettingsContextValue>(
     () => ({
       settings,
@@ -325,6 +374,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       mapSettings,
       updateMapSettings,
       resetMapSettings,
+      visualSettings,
+      updateVisualSettings,
+      resetVisualSettings,
     }),
     [
       hudVisibility,
@@ -337,6 +389,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       settings,
       updateHudVisibility,
       updateMapSettings,
+      visualSettings,
+      updateVisualSettings,
+      resetVisualSettings,
     ],
   );
 
@@ -355,6 +410,8 @@ export {
   DEFAULTS,
   DEFAULT_HUD_VISIBILITY,
   DEFAULT_MAP_SETTINGS,
+  DEFAULT_VISUAL_SETTINGS,
+  normalizeRenderScale,
   frcTeamToRobotIp,
   ntPathFromTableAndEntry,
   ntSelectedPathTopics,
@@ -362,4 +419,5 @@ export {
   type HudVisibilitySettings,
   type MapSettings,
   type SharedSettingsPayload,
+  type VisualSettings,
 };

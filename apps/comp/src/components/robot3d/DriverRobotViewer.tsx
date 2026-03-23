@@ -9,6 +9,7 @@ import * as THREE from "three";
 import type { JointValue } from "./RobotViewer";
 import cameraPoses from "../../../public/cad/camera-poses.json";
 import rigConfig from "../../../public/cad/robot-rig.json";
+import { useSettings } from "@/lib/settings";
 
 const BUMPER_RED = new THREE.Color(0xdd1111);
 const BUMPER_BLUE = new THREE.Color(0x1111dd);
@@ -411,6 +412,7 @@ export function DriverRobotViewer({
   isRedAlliance?: boolean;
   isActive?: boolean;
 }) {
+  const { visualSettings } = useSettings();
   return (
     <Canvas
       camera={{
@@ -420,7 +422,8 @@ export function DriverRobotViewer({
         far: 50,
       }}
       gl={{ antialias: true }}
-      frameloop={isActive === false ? "never" : "demand"}
+      dpr={visualSettings.renderScale * (typeof window !== "undefined" ? window.devicePixelRatio : 1)}
+      frameloop={isActive === false ? "never" : "always"}
       style={{ width: "100%", height: "100%", background: "#000" }}
     >
       <DriverScene modelUrl={modelUrl} joints={joints} stateIndex={stateIndex} isRedAlliance={isRedAlliance} />

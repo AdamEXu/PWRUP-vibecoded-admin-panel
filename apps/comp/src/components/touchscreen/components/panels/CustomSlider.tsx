@@ -13,15 +13,23 @@ interface CustomSliderProps {
   onChange: (value: number) => void;
   label?: string;
   hints?: SliderHintRange[];
+  snapPoints?: number[]; // values in 0–1 space; if provided, snaps to nearest during drag
 }
 
-export function CustomSlider({ value, onChange, label, hints }: CustomSliderProps) {
+export function CustomSlider({ value, onChange, label, hints, snapPoints }: CustomSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartX = useRef(0);
   const dragStartValue = useRef(0);
 
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
+
+  const snapTo = (v: number): number => {
+    if (!snapPoints || snapPoints.length === 0) return v;
+    return snapPoints.reduce((nearest, pt) =>
+      Math.abs(pt - v) < Math.abs(nearest - v) ? pt : nearest
+    );
+  };
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -40,9 +48,10 @@ export function CustomSlider({ value, onChange, label, hints }: CustomSliderProp
       if (!track) return;
       const trackWidth = track.getBoundingClientRect().width;
       const delta = (e.clientX - dragStartX.current) / trackWidth;
-      onChange(clamp(dragStartValue.current + delta));
+      onChange(snapTo(clamp(dragStartValue.current + delta)));
     },
-    [isDragging, onChange],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isDragging, onChange, snapPoints],
   );
 
   const onPointerUp = useCallback(() => {

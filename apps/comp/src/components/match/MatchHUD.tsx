@@ -9,6 +9,7 @@ import { HeaderBar } from "./HeaderBar";
 import { ShiftIndicator } from "./ShiftIndicator";
 import { CameraOverlay } from "./CameraOverlay";
 import { ConnectionLost } from "./ConnectionLost";
+import { VISUAL_RELOAD_CHANNEL } from "@/components/touchscreen/tabs/VisualTab";
 
 const MiniMap3D = dynamic(
   () => import("./MiniMap3D").then((m) => ({ default: m.MiniMap3D })),
@@ -51,6 +52,17 @@ export function MatchHUD() {
   const lastLaneAlignmentValueRef = useRef<boolean | null>(null);
 
   const state = useMatchState();
+
+  useEffect(() => {
+    let ch: BroadcastChannel | null = null;
+    try {
+      ch = new BroadcastChannel(VISUAL_RELOAD_CHANNEL);
+      ch.onmessage = () => window.location.reload();
+    } catch {
+      // ignore
+    }
+    return () => ch?.close();
+  }, []);
 
   // Reset lane alignment tracking when a new match starts so toasts fire correctly
   useEffect(() => {

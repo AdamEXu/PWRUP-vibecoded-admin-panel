@@ -25,12 +25,19 @@ export interface MapSettings {
   // Idle behavior is always enabled (no longer configurable)
 }
 
+export interface VisualSettings {
+  logarithmicDepthBuffer: boolean;
+  backdropBlur: boolean;
+  renderScale: number; // 0.25 | 0.5 | 0.75 | 1.0
+}
+
 export interface SharedSettingsPayload {
   version: number;
   updatedAtIso: string;
   settings: ConnectionSettings;
   hudVisibility: HudVisibilitySettings;
   mapSettings?: MapSettings;
+  visualSettings?: VisualSettings;
 }
 
 export const DEFAULTS: ConnectionSettings = {
@@ -56,6 +63,20 @@ export const DEFAULT_MAP_SETTINGS: MapSettings = {
   angle: 0.3,
   zoom: 0.5,
 };
+
+const VALID_RENDER_SCALES = [0.25, 0.5, 0.75, 1.0] as const;
+
+export const DEFAULT_VISUAL_SETTINGS: VisualSettings = {
+  logarithmicDepthBuffer: false,
+  backdropBlur: true,
+  renderScale: 1.0,
+};
+
+export function normalizeRenderScale(v: unknown): number {
+  return VALID_RENDER_SCALES.includes(v as typeof VALID_RENDER_SCALES[number])
+    ? (v as number)
+    : DEFAULT_VISUAL_SETTINGS.renderScale;
+}
 
 export function frcTeamToRobotIp(teamNumber: number, lastOctet = 2): string {
   const team = Math.max(0, Math.floor(teamNumber));

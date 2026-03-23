@@ -6,6 +6,7 @@ export const ALL_TABS: TabDef[] = [
   { id: "effects", label: "Special Effects", symbol: "􁅋", activeSymbol: "􁅌" },
   { id: "howard", label: "Pictures of Howard", symbol: "􀎸", activeSymbol: "􀙌" },
   { id: "robot3d", label: "Robot 3D", symbol: "􀬨", activeSymbol: "􀳴" },
+  { id: "visual", label: "Visual Settings", symbol: "􁂮", activeSymbol: "􁂯" },
 ];
 
 export const RIGHT_PANELS: RightPanelDef[] = [

@@ -7,6 +7,7 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as THREE from "three";
 import rigConfig from "../../../public/cad/robot-rig.json";
+import { useSettings } from "@/lib/settings";
 
 const BUMPER_RED = new THREE.Color(0xdd1111);
 const BUMPER_BLUE = new THREE.Color(0x1111dd);
@@ -125,10 +126,12 @@ function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: 
 }
 
 export function RobotViewer({ modelUrl, joints, isRedAlliance = false }: { modelUrl: string; joints: JointValue[]; isRedAlliance?: boolean }) {
+  const { visualSettings } = useSettings();
   return (
     <Canvas
       camera={{ position: [1.5, 1, 1.5], fov: 50, near: 0.01, far: 50 }}
       gl={{ antialias: true }}
+      dpr={visualSettings.renderScale * (typeof window !== "undefined" ? window.devicePixelRatio : 1)}
       frameloop="always"
       style={{ width: "100%", height: "100%" }}
     >

@@ -348,6 +348,7 @@ function MiniMap3DInner(props: MiniMap3DProps) {
 }
 
 export function MiniMap3D(props: MiniMap3DProps) {
+  const { visualSettings } = useSettings();
   return (
     <div
       className="fixed"
@@ -365,7 +366,8 @@ export function MiniMap3D(props: MiniMap3DProps) {
     >
       <Canvas
         camera={{ position: [0, 8, 0], fov: 50, near: 0.1, far: 100 }}
-        gl={{ antialias: true, logarithmicDepthBuffer: true, alpha: true }}
+        gl={{ antialias: true, logarithmicDepthBuffer: visualSettings.logarithmicDepthBuffer, alpha: true }}
+        dpr={visualSettings.renderScale * (typeof window !== "undefined" ? window.devicePixelRatio : 1)}
         frameloop="always"
         style={{ width: "100%", height: "100%", pointerEvents: "none" }}
       >

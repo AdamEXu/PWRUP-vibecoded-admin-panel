@@ -3,6 +3,7 @@ import { dockId } from "../../model";
 import type { DockIcon, OverlayTabId } from "../../model";
 import { DroppableZone } from "../dnd/DroppableZone";
 import { SortableDockIcon } from "./SortableDockIcon";
+import { useSettings } from "@/lib/settings";
 
 export function DockDrawer({
   availableIcons,
@@ -17,6 +18,7 @@ export function DockDrawer({
   onOpen: (id: string) => void;
   onCloseAnimEnd: () => void;
 }) {
+  const { visualSettings } = useSettings();
   return (
     <div
       className={[
@@ -28,7 +30,7 @@ export function DockDrawer({
       <div
         className={[
           "flex overflow-clip p-[10px] w-[860px]",
-          "backdrop-blur-[8px] bg-black/50",
+          visualSettings.backdropBlur ? "backdrop-blur-[8px] bg-black/50" : "bg-black/90",
           "border-[#70cd35] border-l-4 border-r-4 border-t-4 border-solid",
         ].join(" ")}
       >

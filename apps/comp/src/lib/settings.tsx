@@ -13,6 +13,8 @@ import {
   DEFAULTS,
   DEFAULT_HUD_VISIBILITY,
   DEFAULT_MAP_SETTINGS,
+  DEFAULT_VISUAL_SETTINGS,
+  normalizeRenderScale,
   frcTeamToRobotIp,
   ntPathFromTableAndEntry,
   ntSelectedPathTopics,
@@ -20,6 +22,7 @@ import {
   type HudVisibilitySettings,
   type MapSettings,
   type SharedSettingsPayload,
+  type VisualSettings,
 } from "@pwrup/shared-core/settings";
 import { getBridge, hasBridge, subscribeSettings } from "./blitzRenderer";
 
@@ -37,6 +40,37 @@ function loadMapSettings(): MapSettings {
     };
   } catch {
     return DEFAULT_MAP_SETTINGS;
+  }
+}
+
+const VISUAL_SETTINGS_KEY = "pwrup-visual-settings";
+
+function loadVisualSettings(): VisualSettings {
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem(VISUAL_SETTINGS_KEY) : null;
+    if (!raw) return DEFAULT_VISUAL_SETTINGS;
+    const parsed = JSON.parse(raw) as Partial<VisualSettings>;
+    return {
+      logarithmicDepthBuffer:
+        typeof parsed.logarithmicDepthBuffer === "boolean"
+          ? parsed.logarithmicDepthBuffer
+          : DEFAULT_VISUAL_SETTINGS.logarithmicDepthBuffer,
+      backdropBlur:
+        typeof parsed.backdropBlur === "boolean"
+          ? parsed.backdropBlur
+          : DEFAULT_VISUAL_SETTINGS.backdropBlur,
+      renderScale: normalizeRenderScale(parsed.renderScale),
+    };
+  } catch {
+    return DEFAULT_VISUAL_SETTINGS;
+  }
+}
+
+function saveVisualSettings(s: VisualSettings) {
+  try {
+    localStorage.setItem(VISUAL_SETTINGS_KEY, JSON.stringify(s));
+  } catch {
+    // Storage unavailable — ignore
   }
 }
 
@@ -79,6 +113,9 @@ interface SettingsContextValue {
   mapSettings: MapSettings;
   updateMapSettings: (patch: Partial<MapSettings>) => void;
   resetMapSettings: () => void;
+  visualSettings: VisualSettings;
+  updateVisualSettings: (patch: Partial<VisualSettings>) => void;
+  resetVisualSettings: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
@@ -88,9 +125,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [hudVisibility, setHudVisibilityState] =
     useState<HudVisibilitySettings>(DEFAULT_HUD_VISIBILITY);
   const [mapSettings, setMapSettingsState] = useState<MapSettings>(() => loadMapSettings());
+  const [visualSettings, setVisualSettingsState] = useState<VisualSettings>(() => loadVisualSettings());
   const versionRef = useRef(0);
   const hudVisibilityRef = useRef<HudVisibilitySettings>(DEFAULT_HUD_VISIBILITY);
   const mapSettingsRef = useRef<MapSettings>(mapSettings);
+  const visualSettingsRef = useRef<VisualSettings>(DEFAULT_VISUAL_SETTINGS);
 
   const applyPayload = useCallback((payload: SharedSettingsPayload) => {
     versionRef.current = payload.version;
@@ -225,6 +264,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     saveMapSettings(DEFAULT_MAP_SETTINGS);
   }, []);
 
+  const updateVisualSettings = useCallback((patch: Partial<VisualSettings>) => {
+    const next: VisualSettings = { ...visualSettingsRef.current, ...patch };
+    visualSettingsRef.current = next;
+    setVisualSettingsState(next);
+    saveVisualSettings(next);
+  }, []);
+
+  const resetVisualSettings = useCallback(() => {
+    visualSettingsRef.current = DEFAULT_VISUAL_SETTINGS;
+    setVisualSettingsState(DEFAULT_VISUAL_SETTINGS);
+    saveVisualSettings(DEFAULT_VISUAL_SETTINGS);
+  }, []);
+
   // Sync mapSettings across windows via BroadcastChannel + storage events
   useEffect(() => {
     const applyRemote = (data: unknown) => {
@@ -273,6 +325,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       mapSettings,
       updateMapSettings,
       resetMapSettings,
+      visualSettings,
+      updateVisualSettings,
+      resetVisualSettings,
     }),
     [
       hudVisibility,
@@ -285,6 +340,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       settings,
       updateHudVisibility,
       updateMapSettings,
+      visualSettings,
+      updateVisualSettings,
+      resetVisualSettings,
     ],
   );
 
@@ -303,6 +361,7 @@ export {
   DEFAULTS,
   DEFAULT_HUD_VISIBILITY,
   DEFAULT_MAP_SETTINGS,
+  DEFAULT_VISUAL_SETTINGS,
   frcTeamToRobotIp,
   ntPathFromTableAndEntry,
   ntSelectedPathTopics,
@@ -310,4 +369,5 @@ export {
   type HudVisibilitySettings,
   type MapSettings,
   type SharedSettingsPayload,
+  type VisualSettings,
 };

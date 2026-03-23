@@ -4,6 +4,7 @@ import { AutoTab } from "./AutoTab";
 import { EffectsTab } from "./EffectsTab";
 import { HowardTab } from "./HowardTab";
 import { SettingsTab } from "./SettingsTab";
+import { VisualTab } from "./VisualTab";
 
 // Canvas must not SSR — dynamic import keeps Three.js out of the server bundle
 const Robot3DTab = dynamic(() => import("./Robot3DTab").then((m) => m.Robot3DTab), {
@@ -23,6 +24,9 @@ export function TouchscreenTabContent({ tabId }: { tabId: OverlayTabId }) {
   }
   if (tabId === "robot3d") {
     return <Robot3DTab />;
+  }
+  if (tabId === "visual") {
+    return <VisualTab />;
   }
   return <EffectsTab />;
 }

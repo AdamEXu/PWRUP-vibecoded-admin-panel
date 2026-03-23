@@ -6,8 +6,9 @@ import type {
   HudVisibilitySettings,
   MapSettings,
   SharedSettingsPayload,
+  VisualSettings,
 } from "./settings-schema";
-import { DEFAULTS, DEFAULT_HUD_VISIBILITY, DEFAULT_MAP_SETTINGS } from "./settings-schema";
+import { DEFAULTS, DEFAULT_HUD_VISIBILITY, DEFAULT_MAP_SETTINGS, DEFAULT_VISUAL_SETTINGS } from "./settings-schema";
 
 function getSharedSettingsPath(): string {
   const fromEnv = process.env.PWRUP_SHARED_SETTINGS_PATH?.trim();
@@ -77,6 +78,10 @@ function normalizeHudVisibility(next: Partial<HudVisibilitySettings> | undefined
   };
 }
 
+function normalizeVisualSettings(_next: Partial<VisualSettings> | undefined): VisualSettings {
+  return DEFAULT_VISUAL_SETTINGS;
+}
+
 function normalizeMapSettings(next: Partial<MapSettings> | undefined): MapSettings {
   return {
     mode: next?.mode === 'follow' || next?.mode === 'driver' ? next.mode : DEFAULT_MAP_SETTINGS.mode,
@@ -96,6 +101,7 @@ function normalizePayload(raw: unknown): SharedSettingsPayload {
   const normalizedSettings = normalizeSettings(parsed?.settings ?? DEFAULTS);
   const normalizedHudVisibility = normalizeHudVisibility(parsed?.hudVisibility);
   const normalizedMapSettings = normalizeMapSettings(parsed?.mapSettings);
+  const normalizedVisualSettings = normalizeVisualSettings(parsed?.visualSettings);
 
   const version =
     typeof parsed?.version === "number" && Number.isFinite(parsed.version) && parsed.version >= 1
@@ -113,6 +119,7 @@ function normalizePayload(raw: unknown): SharedSettingsPayload {
     settings: normalizedSettings,
     hudVisibility: normalizedHudVisibility,
     mapSettings: normalizedMapSettings,
+    visualSettings: normalizedVisualSettings,
   };
 }
 
@@ -152,6 +159,7 @@ export async function updateSharedSettings(next: {
   settings?: ConnectionSettings;
   hudVisibility?: HudVisibilitySettings;
   mapSettings?: MapSettings;
+  visualSettings?: VisualSettings;
 }): Promise<SharedSettingsPayload> {
   const current = await readSharedSettings();
   const updated: SharedSettingsPayload = {
@@ -160,6 +168,7 @@ export async function updateSharedSettings(next: {
     settings: normalizeSettings(next.settings ?? current.settings),
     hudVisibility: normalizeHudVisibility(next.hudVisibility ?? current.hudVisibility),
     mapSettings: normalizeMapSettings(next.mapSettings ?? current.mapSettings),
+    visualSettings: normalizeVisualSettings(next.visualSettings ?? current.visualSettings),
   };
 
   await writeAtomically(getSharedSettingsPath(), updated);
