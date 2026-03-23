@@ -68,6 +68,7 @@ function useGLTFModel(url: string, useWrapper = false, bumperNodeNames: string[]
   const restQuatsRef = useRef<Map<string, THREE.Quaternion>>(new Map());
   const restPosRef = useRef<Map<string, THREE.Vector3>>(new Map());
   const bumperMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const nodeMapRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -80,10 +81,12 @@ function useGLTFModel(url: string, useWrapper = false, bumperNodeNames: string[]
     loader.load(url, (gltf) => {
       if (rootRef.current) threeScene.remove(rootRef.current);
       bumperMatsRef.current = [];
+      nodeMapRef.current.clear();
       const bumperSet = new Set(bumperNodeNames);
       gltf.scene.traverse((node) => {
         restQuatsRef.current.set(node.name, node.quaternion.clone());
         restPosRef.current.set(node.name, node.position.clone());
+        nodeMapRef.current.set(node.name, node);
         if ((node as THREE.Mesh).isMesh) {
           const mat = (node as THREE.Mesh).material;
           const mats = Array.isArray(mat) ? mat : [mat];
@@ -145,7 +148,7 @@ function useGLTFModel(url: string, useWrapper = false, bumperNodeNames: string[]
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
-  return { rootRef, innerRef, restQuatsRef, restPosRef, bumperMatsRef };
+  return { rootRef, innerRef, restQuatsRef, restPosRef, bumperMatsRef, nodeMapRef };
 }
 
 // ── Scene component ─────────────────────────────────────────────────────────
@@ -163,8 +166,10 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
   useGLTFModel(FIELD_URL);
 
   // Load robot — use wrapper so heading (Y rotation) doesn't conflict with Z-up→Y-up (X rotation)
-  const { rootRef: robotRef, innerRef: robotInnerRef, restQuatsRef, restPosRef, bumperMatsRef } =
+  const { rootRef: robotRef, innerRef: robotInnerRef, restQuatsRef, restPosRef, bumperMatsRef, nodeMapRef } =
     useGLTFModel(ROBOT_URL, true, rigConfig.bumperNodes);
+  const jointAxisCacheRef = useRef<Map<string, THREE.Vector3>>(new Map());
+  const _tmpQuat = useRef(new THREE.Quaternion());
 
   // Recolor bumpers when alliance changes
   useEffect(() => {
@@ -218,18 +223,22 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
     // ── Apply joints on the inner scene (which has the Z-up→Y-up rotation) ──
     if (inner) {
       for (const joint of jointValuesRef.current) {
-        const node = inner.getObjectByName(joint.nodeName);
+        const node = nodeMapRef.current.get(joint.nodeName);
         if (!node) continue;
         const restQuat = restQuatsRef.current.get(joint.nodeName);
         const restPos = restPosRef.current.get(joint.nodeName);
         if (!restQuat || !restPos) continue;
 
+        let axis = jointAxisCacheRef.current.get(joint.nodeName);
+        if (!axis) {
+          axis = new THREE.Vector3(...joint.axis).normalize();
+          jointAxisCacheRef.current.set(joint.nodeName, axis);
+        }
+
         if (joint.type === "revolute") {
-          const axis = new THREE.Vector3(...joint.axis).normalize();
-          const q = new THREE.Quaternion().setFromAxisAngle(axis, joint.value);
-          node.quaternion.copy(restQuat).multiply(q);
+          _tmpQuat.current.setFromAxisAngle(axis, joint.value);
+          node.quaternion.copy(restQuat).multiply(_tmpQuat.current);
         } else {
-          const axis = new THREE.Vector3(...joint.axis).normalize();
           node.position.copy(restPos).addScaledVector(axis, joint.value);
         }
       }

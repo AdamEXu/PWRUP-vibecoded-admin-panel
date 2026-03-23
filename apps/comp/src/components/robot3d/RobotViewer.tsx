@@ -28,6 +28,9 @@ function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: 
   const restQuatsRef = useRef<Map<string, THREE.Quaternion>>(new Map());
   const restPosRef = useRef<Map<string, THREE.Vector3>>(new Map());
   const bumperMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const jointNodeCacheRef = useRef<Map<string, THREE.Object3D>>(new Map());
+  const jointAxisCacheRef = useRef<Map<string, THREE.Vector3>>(new Map());
+  const _tmpQuat = useRef(new THREE.Quaternion());
 
   // OrbitControls
   useEffect(() => {
@@ -50,6 +53,7 @@ function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: 
       if (sceneRootRef.current) scene.remove(sceneRootRef.current);
 
       bumperMatsRef.current = [];
+      jointNodeCacheRef.current.clear();
       const bumperSet = new Set(rigConfig.bumperNodes);
       // Capture rest transforms before any joint is applied
       gltf.scene.traverse((node) => {
@@ -97,19 +101,28 @@ function Scene({ modelUrl, joints, isRedAlliance }: { modelUrl: string; joints: 
     if (!root) return;
 
     for (const joint of joints) {
-      const node = root.getObjectByName(joint.nodeName);
-      if (!node) continue;
+      let node = jointNodeCacheRef.current.get(joint.nodeName);
+      if (!node) {
+        const found = root.getObjectByName(joint.nodeName);
+        if (!found) continue;
+        jointNodeCacheRef.current.set(joint.nodeName, found);
+        node = found;
+      }
 
       const restQuat = restQuatsRef.current.get(joint.nodeName);
       const restPos = restPosRef.current.get(joint.nodeName);
       if (!restQuat || !restPos) continue;
 
+      let axis = jointAxisCacheRef.current.get(joint.nodeName);
+      if (!axis) {
+        axis = new THREE.Vector3(...joint.axis).normalize();
+        jointAxisCacheRef.current.set(joint.nodeName, axis);
+      }
+
       if (joint.type === "revolute") {
-        const axis = new THREE.Vector3(...joint.axis).normalize();
-        const q = new THREE.Quaternion().setFromAxisAngle(axis, joint.value);
-        node.quaternion.copy(restQuat).multiply(q);
+        _tmpQuat.current.setFromAxisAngle(axis, joint.value);
+        node.quaternion.copy(restQuat).multiply(_tmpQuat.current);
       } else {
-        const axis = new THREE.Vector3(...joint.axis).normalize();
         node.position.copy(restPos).addScaledVector(axis, joint.value);
       }
     }
