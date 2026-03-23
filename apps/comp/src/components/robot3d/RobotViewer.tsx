@@ -144,7 +144,7 @@ export function RobotViewer({ modelUrl, joints, isRedAlliance = false }: { model
     <Canvas
       camera={{ position: [1.5, 1, 1.5], fov: 50, near: 0.01, far: 50 }}
       gl={{ antialias: true }}
-      dpr={visualSettings.renderScale * (typeof window !== "undefined" ? window.devicePixelRatio : 1)}
+      dpr={visualSettings.renderScale * ((typeof window !== "undefined" ? window.devicePixelRatio : 1) || 1)}
       frameloop="always"
       style={{ width: "100%", height: "100%" }}
     >

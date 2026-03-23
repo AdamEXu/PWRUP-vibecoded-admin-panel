@@ -161,21 +161,6 @@ export function useMatchState(): MatchState {
     NetworkTablesTypeInfos.kBoolean,
     false,
   );
-  const { value: robotPoseX } = useNTopic<number>(
-    NT.MATCH_HUD_POSE_X,
-    NetworkTablesTypeInfos.kDouble,
-    8.27, // field center X (WPILib coords)
-  );
-  const { value: robotPoseY } = useNTopic<number>(
-    NT.MATCH_HUD_POSE_Y,
-    NetworkTablesTypeInfos.kDouble,
-    4.105, // field center Y (WPILib coords)
-  );
-  const { value: robotHeading } = useNTopic<number>(
-    NT.MATCH_HUD_HEADING,
-    NetworkTablesTypeInfos.kDouble,
-    0,
-  );
   const { value: autoAlignActive } = useNTopic<boolean>(
     NT.MATCH_HUD_AUTO_ALIGN_ACTIVE,
     NetworkTablesTypeInfos.kBoolean,
@@ -215,9 +200,6 @@ export function useMatchState(): MatchState {
     gameSpecificMessage,
     fmsControlData,
     fmsMatchTime: periodTimeRemaining,
-    robotPoseX,
-    robotPoseY,
-    robotHeading,
     autoAlignActive,
     autoAlignDistance,
     autoAlignReady,

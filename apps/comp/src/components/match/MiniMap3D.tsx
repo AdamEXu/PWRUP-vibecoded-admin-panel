@@ -7,7 +7,7 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import * as THREE from "three";
 import { NetworkTablesTypeInfos } from "ntcore-ts-client";
 import { useSettings } from "@/lib/settings";
-import { useRobotJoints } from "@/components/robot3d/useRobotJoints";
+import { useRobotJointsRef } from "@/components/robot3d/useRobotJoints";
 import type { JointValue } from "@/components/robot3d/RobotViewer";
 import type { MatchPhase } from "@/lib/match/types";
 import { NT } from "@/lib/match/constants";
@@ -305,19 +305,16 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
 
 // ── Root component ───────────────────────────────────────────────────────────
 interface MiniMap3DProps {
-  poseX: number;
-  poseY: number;
-  heading: number;
   isRedAlliance: boolean;
   matchPhase: MatchPhase;
 }
 
 function MiniMap3DInner(props: MiniMap3DProps) {
-  const { jointValuesRef } = useRobotJoints();
+  const { jointValuesRef } = useRobotJointsRef();
 
   // Subscribe to pose topics directly — values land in a ref so useFrame
   // picks them up on the very next animation frame without a React re-render.
-  const poseRef = useRef({ x: props.poseX, y: props.poseY, heading: props.heading });
+  const poseRef = useRef({ x: 8.27, y: 4.105, heading: 0 });
 
   useEffect(() => {
     if (!hasBridge()) return;
@@ -376,7 +373,7 @@ export function MiniMap3D(props: MiniMap3DProps) {
       <Canvas
         camera={{ position: [0, 8, 0], fov: 50, near: 0.1, far: 100 }}
         gl={{ antialias: true, logarithmicDepthBuffer: visualSettings.logarithmicDepthBuffer, alpha: true }}
-        dpr={visualSettings.renderScale * (typeof window !== "undefined" ? window.devicePixelRatio : 1)}
+        dpr={visualSettings.renderScale * ((typeof window !== "undefined" ? window.devicePixelRatio : 1) || 1)}
         frameloop="always"
         style={{ width: "100%", height: "100%", pointerEvents: "none" }}
       >

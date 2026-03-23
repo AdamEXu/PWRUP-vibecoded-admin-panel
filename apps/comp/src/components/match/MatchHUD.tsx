@@ -118,9 +118,6 @@ export function MatchHUD() {
       />
 
       <MiniMap3D
-        poseX={state.robotPoseX}
-        poseY={state.robotPoseY}
-        heading={state.robotHeading}
         isRedAlliance={state.isRedAlliance}
         matchPhase={state.matchPhase}
       />

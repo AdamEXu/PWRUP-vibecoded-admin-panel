@@ -30,11 +30,6 @@ export interface MatchState {
   /** Remaining seconds in the currently published match phase. */
   fmsMatchTime: number;
 
-  // Robot pose
-  robotPoseX: number;
-  robotPoseY: number;
-  robotHeading: number;
-
   // Auto-align
   autoAlignActive: boolean;
   autoAlignDistance: number;

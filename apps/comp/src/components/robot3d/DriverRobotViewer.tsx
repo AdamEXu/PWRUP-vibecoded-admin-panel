@@ -109,12 +109,12 @@ interface TransitionState {
 // ---------------------------------------------------------------------------
 function DriverScene({
   modelUrl,
-  joints,
+  jointsRef,
   stateIndex,
   isRedAlliance,
 }: {
   modelUrl: string;
-  joints: JointValue[];
+  jointsRef: React.RefObject<JointValue[]>;
   stateIndex: number;
   isRedAlliance: boolean;
 }) {
@@ -277,9 +277,6 @@ function DriverScene({
     invalidate();
   }, [isRedAlliance]);
 
-  // ---- Invalidate on joint updates so demand rendering picks them up ----
-  useEffect(() => { invalidate(); }, [joints]);
-
   // ---- State transition trigger ----
   useEffect(() => {
     if (stateIndex === prevStateIndexRef.current) return;
@@ -307,7 +304,7 @@ function DriverScene({
     // Apply joints
     const root = sceneRootRef.current;
     if (root) {
-      for (const joint of joints) {
+      for (const joint of jointsRef.current ?? []) {
         let node = jointNodeCacheRef.current.get(joint.nodeName);
         if (!node) {
           const found = root.getObjectByName(joint.nodeName);
@@ -414,13 +411,13 @@ function DriverScene({
 // ---------------------------------------------------------------------------
 export function DriverRobotViewer({
   modelUrl,
-  joints,
+  jointsRef,
   stateIndex,
   isRedAlliance = false,
   isActive,
 }: {
   modelUrl: string;
-  joints: JointValue[];
+  jointsRef: React.RefObject<JointValue[]>;
   stateIndex: number;
   isRedAlliance?: boolean;
   isActive?: boolean;
@@ -435,11 +432,11 @@ export function DriverRobotViewer({
         far: 50,
       }}
       gl={{ antialias: true }}
-      dpr={visualSettings.renderScale * (typeof window !== "undefined" ? window.devicePixelRatio : 1)}
+      dpr={visualSettings.renderScale * ((typeof window !== "undefined" ? window.devicePixelRatio : 1) || 1)}
       frameloop={isActive === false ? "never" : "always"}
       style={{ width: "100%", height: "100%", background: "#000" }}
     >
-      <DriverScene modelUrl={modelUrl} joints={joints} stateIndex={stateIndex} isRedAlliance={isRedAlliance} />
+      <DriverScene modelUrl={modelUrl} jointsRef={jointsRef} stateIndex={stateIndex} isRedAlliance={isRedAlliance} />
     </Canvas>
   );
 }

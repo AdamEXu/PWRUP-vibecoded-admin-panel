@@ -129,7 +129,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const versionRef = useRef(0);
   const hudVisibilityRef = useRef<HudVisibilitySettings>(DEFAULT_HUD_VISIBILITY);
   const mapSettingsRef = useRef<MapSettings>(mapSettings);
-  const visualSettingsRef = useRef<VisualSettings>(DEFAULT_VISUAL_SETTINGS);
+  const visualSettingsRef = useRef<VisualSettings>(visualSettings);
 
   const applyPayload = useCallback((payload: SharedSettingsPayload) => {
     versionRef.current = payload.version;

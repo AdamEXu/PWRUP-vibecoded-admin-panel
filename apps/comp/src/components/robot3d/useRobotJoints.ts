@@ -85,6 +85,64 @@ function computeJointValues(
   }));
 }
 
+export interface RobotJointsRefResult {
+  jointValuesRef: React.RefObject<JointValue[]>;
+}
+
+/**
+ * Lightweight joint hook for render-only views (driver tab, minimap).
+ *
+ * Subscribes to the same NT topics as useRobotJoints but never calls setState —
+ * updates go straight to jointValuesRef so Three.js useFrame reads them without
+ * triggering any React re-renders.
+ */
+export function useRobotJointsRef(): RobotJointsRefResult {
+  const bridgeAvailable = hasBridge();
+  const ntValuesRef = useRef<Record<string, NtJointState>>({});
+  const jointValuesRef = useRef<JointValue[]>([]);
+
+  useEffect(() => {
+    if (!bridgeAvailable) return;
+
+    let disposed = false;
+    const cleanups: Array<() => void> = [];
+
+    ntBackedJoints.forEach(([key, joint]) => {
+      void subscribeNtTopic<number>(
+        {
+          topicPath: joint.ntTopic!,
+          typeInfo: NetworkTablesTypeInfos.kDouble,
+          defaultValue: 0,
+        },
+        (update) => {
+          if (disposed) return;
+          const newState: NtJointState = {
+            value: transformNtValue(joint, Number(update.value)),
+            hasValue: update.hasValue,
+            isConnected: update.isConnected,
+          };
+          ntValuesRef.current = { ...ntValuesRef.current, [key]: newState };
+          // No setState — ref update only, no React re-render
+          jointValuesRef.current = computeJointValues(ntValuesRef.current, {});
+        },
+      ).then((cleanup) => {
+        if (disposed) {
+          cleanup();
+          return;
+        }
+        cleanups.push(cleanup);
+      });
+    });
+
+    return () => {
+      disposed = true;
+      cleanups.forEach((cleanup) => cleanup());
+    };
+  }, [bridgeAvailable]);
+
+  return { jointValuesRef };
+}
+
 export interface RobotJointsResult {
   jointValues: JointValue[];
   jointValuesRef: React.RefObject<JointValue[]>;
