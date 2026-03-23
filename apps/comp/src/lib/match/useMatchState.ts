@@ -71,6 +71,15 @@ function mapAimMode(mode: number): MatchState["aimMode"] {
   }
 }
 
+export function useIsRedAlliance(): boolean {
+  const { value } = useNTopic<boolean>(
+    NT.MATCH_HUD_IS_RED_ALLIANCE,
+    NetworkTablesTypeInfos.kBoolean,
+    true,
+  );
+  return value;
+}
+
 export function useMatchState(): MatchState {
   const { value: seq, isConnected: ntConnected } = useNTopic<number>(
     NT.MATCH_HUD_SEQ,

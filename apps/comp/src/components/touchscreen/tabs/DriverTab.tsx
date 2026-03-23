@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { DriverRobotViewer } from "@/components/robot3d/DriverRobotViewer";
 import { useRobotJoints } from "@/components/robot3d/useRobotJoints";
-import { useMatchState } from "@/lib/match/useMatchState";
+import { useIsRedAlliance } from "@/lib/match/useMatchState";
 import rigConfig from "../../../../public/cad/robot-rig.json";
 
 export function DriverTab({ isActive }: { isActive?: boolean }) {
   const [stateIndex, setStateIndex] = useState(0);
   const { jointValues } = useRobotJoints();
-  const { isRedAlliance } = useMatchState();
+  const isRedAlliance = useIsRedAlliance();
 
   return (
     <div className="relative h-full w-full bg-black">
