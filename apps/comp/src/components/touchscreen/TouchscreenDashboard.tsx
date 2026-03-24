@@ -1,6 +1,6 @@
 "use client";
 
-import { DndContext, DragOverlay, closestCenter } from "@dnd-kit/core";
+import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { useCallback, useState } from "react";
 import { ConnectionLost } from "../match/ConnectionLost";
 import { LeftRail } from "./components/chrome/LeftRail";
@@ -67,7 +67,7 @@ export function TouchscreenDashboard() {
     enabled: activeOverlayTab !== null && entryAnimDone,
   });
 
-  const { draggingTabDef, handleDragEnd, handleDragStart, sensors } = useTouchscreenDnd({
+  const { collisionDetection, draggingTabDef, handleDragCancel, handleDragEnd, handleDragStart, sensors } = useTouchscreenDnd({
     leftRailIcons,
     setLeftRailIcons,
     dockIcons,
@@ -78,9 +78,10 @@ export function TouchscreenDashboard() {
     <DndContext
       id={TOUCHSCREEN_DND_CONTEXT_ID}
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="fixed top-0 bottom-0 z-0 bg-black" style={driverLayerStyle}>
         <DriverTab isActive={isDriverBase} />

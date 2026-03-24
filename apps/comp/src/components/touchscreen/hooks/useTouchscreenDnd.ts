@@ -2,14 +2,39 @@ import { useCallback, useState } from "react";
 import {
   MouseSensor,
   TouchSensor,
+  closestCenter,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { ALL_TABS, parseId } from "../model";
+import { ALL_TABS, RAIL_PREFIX, DOCK_PREFIX, parseId } from "../model";
 import type { DockIcon, OverlayTabId } from "../model";
+
+/**
+ * Custom collision detection that prioritises sortable items (rail-*, dock-*)
+ * over droppable zone containers (zone-rail, zone-dock).
+ *
+ * This prevents `closestCenter` from resolving to a zone container when the
+ * cursor lands in the gap between icons, which previously caused silent
+ * reorder failures.
+ */
+const sortableFirstCollision: CollisionDetection = (args) => {
+  const sortableOnly = args.droppableContainers.filter((c) => {
+    const id = String(c.id);
+    return id.startsWith(RAIL_PREFIX) || id.startsWith(DOCK_PREFIX);
+  });
+
+  if (sortableOnly.length > 0) {
+    const hit = closestCenter({ ...args, droppableContainers: sortableOnly });
+    if (hit.length > 0) return hit;
+  }
+
+  // Fall back to all droppables (zones) — needed when a zone is empty
+  return closestCenter(args);
+};
 
 export function useTouchscreenDnd({
   leftRailIcons,
@@ -34,6 +59,10 @@ export function useTouchscreenDnd({
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const parsed = parseId(String(event.active.id));
     setDraggingId(parsed ? parsed.tabId : String(event.active.id));
+  }, []);
+
+  const handleDragCancel = useCallback(() => {
+    setDraggingId(null);
   }, []);
 
   const handleDragEnd = useCallback(
@@ -77,7 +106,7 @@ export function useTouchscreenDnd({
             const targetIdx = leftRailIcons.indexOf(overParsed.tabId as OverlayTabId);
             setLeftRailIcons((prev) => {
               const next = [...prev];
-              next.splice(targetIdx + 1, 0, tabId);
+              next.splice(targetIdx, 0, tabId);
               return next;
             });
           } else {
@@ -96,7 +125,9 @@ export function useTouchscreenDnd({
   );
 
   return {
+    collisionDetection: sortableFirstCollision,
     draggingTabDef,
+    handleDragCancel,
     handleDragEnd,
     handleDragStart,
     sensors,
