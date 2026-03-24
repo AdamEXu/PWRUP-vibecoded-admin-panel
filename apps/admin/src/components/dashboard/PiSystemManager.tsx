@@ -1,5 +1,5 @@
 // src/components/dashboard/PiSystemManager.tsx - Purpose: CRUD list for Pi systems
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardHeader,
@@ -27,6 +27,17 @@ export function PiSystemManager({
   onRemovePi,
 }: PiSystemManagerProps) {
   const [newPiName, setNewPiName] = useState("");
+  const [nowMs, setNowMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   const handleAddPi = () => {
     if (newPiName.trim()) {
@@ -47,7 +58,8 @@ export function PiSystemManager({
         </Badge>
       );
     }
-    const timeDiff = Date.now() - piData.lastSeen.getTime();
+    const currentTimeMs = nowMs ?? piData.lastSeen.getTime();
+    const timeDiff = currentTimeMs - piData.lastSeen.getTime();
     if (timeDiff < 5000) {
       return (
         <Badge className="bg-emerald-900/30 text-emerald-400 border-emerald-700/50">

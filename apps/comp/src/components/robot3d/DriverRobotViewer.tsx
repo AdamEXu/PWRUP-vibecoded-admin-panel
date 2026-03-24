@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
@@ -123,13 +123,13 @@ function DriverScene({
   isRedAlliance: boolean | null;
 }) {
   const { camera, gl, scene, invalidate } = useThree();
-  const perspCamera = camera as THREE.PerspectiveCamera;
+  const cameraRef = useRef(camera as THREE.PerspectiveCamera);
 
   // Refs
   const controlsRef = useRef<OrbitControls | null>(null);
   const jointAxisCacheRef = useRef<Map<string, THREE.Vector3>>(new Map());
   const _tmpQuat = useRef(new THREE.Quaternion());
-  const lastInputEndRef = useRef(performance.now());
+  const lastInputEndRef = useRef(0);
   const isDraggingRef = useRef(false);
   const idleTriggeredRef = useRef(false);
   const isTransitioningRef = useRef(false);
@@ -144,6 +144,7 @@ function DriverScene({
 
   // ---- OrbitControls setup ----
   useEffect(() => {
+    cameraRef.current = camera as THREE.PerspectiveCamera;
     const controls = new OrbitControls(camera, gl.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = ORBIT_DAMPING_FACTOR;
@@ -183,6 +184,7 @@ function DriverScene({
     controls.addEventListener("end", onEnd);
 
     controlsRef.current = controls;
+    lastInputEndRef.current = performance.now();
     return () => {
       if (idleTimeoutRef.current) { clearTimeout(idleTimeoutRef.current); idleTimeoutRef.current = null; }
       controls.removeEventListener("change", onChange);
@@ -191,7 +193,7 @@ function DriverScene({
       controls.dispose();
       controlsRef.current = null;
     };
-  }, [camera, gl.domElement]);
+  }, [camera, gl.domElement, invalidate]);
 
   // ---- Load GLB model (cached by useLoader) ----
   const gltf = useLoader(GLTFLoader, modelUrl, (l) => l.setDRACOLoader(_dracoLoader));
@@ -235,7 +237,7 @@ function DriverScene({
   }, [clonedScene, scene]);
 
   // Helper to start a spherical camera transition
-  function startTransition(pose: CameraPose, duration: number) {
+  const startTransition = useCallback((pose: CameraPose, duration: number) => {
     const controls = controlsRef.current;
     if (!controls) return;
 
@@ -254,13 +256,13 @@ function DriverScene({
       endTheta: endSph.theta,
       startTarget: currentTarget,
       endTarget: pose.target,
-      startFov: perspCamera.fov,
+      startFov: cameraRef.current.fov,
       endFov: pose.fov,
       startTime: performance.now(),
       duration,
     };
     isTransitioningRef.current = true;
-  }
+  }, [camera]);
 
   // ---- Recolor bumpers when alliance changes (null = no value yet, keep model color) ----
   useEffect(() => {
@@ -268,11 +270,7 @@ function DriverScene({
     const color = isRedAlliance ? BUMPER_RED : BUMPER_BLUE;
     for (const mat of bumperMats) mat.color.copy(color);
     invalidate();
-  }, [isRedAlliance, bumperMats]);
-
-  // ---- Invalidate on joint updates so demand rendering picks them up ----
-  const joints = jointsRef.current;
-  useEffect(() => { invalidate(); }, [joints]);
+  }, [bumperMats, invalidate, isRedAlliance]);
 
   // ---- State transition trigger ----
   useEffect(() => {
@@ -290,8 +288,7 @@ function DriverScene({
     startTransition(targetPose, TRANSITION_DURATION_MS);
     idleTriggeredRef.current = false;
     invalidate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stateIndex]);
+  }, [invalidate, startTransition, stateIndex]);
 
   // ---- Per-frame update ----
   useFrame(() => {
@@ -332,8 +329,8 @@ function DriverScene({
           ...fromSpherical(t.endRadius, t.endPhi, t.endTheta, t.endTarget),
         );
         controls.target.set(...t.endTarget);
-        perspCamera.fov = t.endFov;
-        perspCamera.updateProjectionMatrix();
+        cameraRef.current.fov = t.endFov;
+        cameraRef.current.updateProjectionMatrix();
         isTransitioningRef.current = false;
         idleTargetRef.current = {
           position: fromSpherical(t.endRadius, t.endPhi, t.endTheta, t.endTarget),
@@ -362,8 +359,8 @@ function DriverScene({
 
         camera.position.set(...pos);
         controls.target.set(...lerpTarget);
-        perspCamera.fov = THREE.MathUtils.lerp(t.startFov, t.endFov, e);
-        perspCamera.updateProjectionMatrix();
+        cameraRef.current.fov = THREE.MathUtils.lerp(t.startFov, t.endFov, e);
+        cameraRef.current.updateProjectionMatrix();
       }
       controls.update();
       return;

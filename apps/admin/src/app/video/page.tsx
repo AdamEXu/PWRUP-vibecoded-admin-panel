@@ -327,12 +327,8 @@ function VideoFeedContent() {
   }, [client]);
 
   const [feedIds, setFeedIds] = useState<string[]>(["1"]);
-  const [topicHistory, setTopicHistory] = useState<string[]>([]);
+  const [topicHistory, setTopicHistory] = useState<string[]>(() => getTopicHistory());
   const nextIdRef = useRef(2);
-
-  useEffect(() => {
-    setTopicHistory(getTopicHistory());
-  }, []);
 
   function addFeed() {
     if (feedIds.length >= MAX_FEEDS) return;

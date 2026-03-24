@@ -34,10 +34,10 @@ export function useMultiPiDashboard() {
   const [topic, setTopic] = useState<string>(DEFAULT_TOPIC);
   const [isConnected, setIsConnected] = useState(false);
   const removedPiSystemsRef = useRef<Set<string>>(new Set());
+  const bridgeAvailable = hasBridge();
 
   useEffect(() => {
-    if (!hasBridge()) {
-      setIsConnected(false);
+    if (!bridgeAvailable) {
       return;
     }
 
@@ -52,7 +52,7 @@ export function useMultiPiDashboard() {
       disposed = true;
       unsubscribe();
     };
-  }, []);
+  }, [bridgeAvailable]);
 
   const handleLogMessage = useCallback(async (payload: Uint8Array) => {
     try {
@@ -242,7 +242,7 @@ export function useMultiPiDashboard() {
   return {
     piSystems,
     globalStats,
-    isConnected,
+    isConnected: bridgeAvailable ? isConnected : false,
     topic,
     setTopic,
     addPiSystem,

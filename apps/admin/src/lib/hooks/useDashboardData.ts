@@ -12,6 +12,14 @@ import {
 import { Address, AutobahnClient } from "autobahn-client";
 import { useSettings } from "@/lib/settings";
 
+function getClientConnectionState(client: AutobahnClient) {
+  try {
+    return client.isConnected();
+  } catch {
+    return false;
+  }
+}
+
 export function useDashboardData() {
   const { settings } = useSettings();
   const client = useMemo(
@@ -20,13 +28,25 @@ export function useDashboardData() {
   );
   const [piStats, setPiStats] = useState<PiStatus | null>(null);
   const [logMessages, setLogMessages] = useState<LogMessage[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(() => getClientConnectionState(client));
 
   useEffect(() => {
-    client.begin();
-    setIsConnected(true);
+    void Promise.resolve()
+      .then(() => client.begin())
+      .then(() => {
+        setIsConnected(getClientConnectionState(client));
+      })
+      .catch(() => {
+        setIsConnected(false);
+      });
+
+    const intervalId = window.setInterval(() => {
+      const connected = getClientConnectionState(client);
+      setIsConnected((prev) => (prev !== connected ? connected : prev));
+    }, 1000);
+
     return () => {
-      setIsConnected(false);
+      window.clearInterval(intervalId);
     };
   }, [client]);
 

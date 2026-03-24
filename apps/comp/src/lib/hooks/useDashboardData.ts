@@ -21,10 +21,10 @@ export function useDashboardData() {
   const [piStats, setPiStats] = useState<PiStatus | null>(null);
   const [logMessages, setLogMessages] = useState<LogMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const bridgeAvailable = hasBridge();
 
   useEffect(() => {
-    if (!hasBridge()) {
-      setIsConnected(false);
+    if (!bridgeAvailable) {
       return;
     }
 
@@ -53,7 +53,7 @@ export function useDashboardData() {
       disposed = true;
       unsubscribe();
     };
-  }, []);
+  }, [bridgeAvailable]);
 
   const handleStatusMessage = useCallback(async (payload: Uint8Array) => {
     try {
@@ -108,7 +108,7 @@ export function useDashboardData() {
   return {
     piStats,
     logMessages,
-    isConnected,
+    isConnected: bridgeAvailable ? isConnected : false,
     clearLogs,
   };
 }

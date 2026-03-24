@@ -1,31 +1,35 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ntSelectedPathTopics, useSettings } from "@/lib/settings";
+
+interface TouchscreenSettingsDraft {
+  host: string;
+  port: string;
+  ntHost: string;
+  ntPort: string;
+  sharedTable: string;
+  selectedPathTopic: string;
+}
+
+function createDraft(settings: ReturnType<typeof useSettings>["settings"]): TouchscreenSettingsDraft {
+  return {
+    host: settings.host,
+    port: String(settings.port),
+    ntHost: settings.networkTables.host,
+    ntPort: String(settings.networkTables.port),
+    sharedTable: settings.networkTables.sharedTable,
+    selectedPathTopic: settings.networkTables.selectedPathTopic,
+  };
+}
 
 export function useTouchscreenSettingsForm() {
   const { settings, setSettings, resetDefaults } = useSettings();
+  const sourceDraft = createDraft(settings);
+  const [draft, setDraft] = useState<TouchscreenSettingsDraft | null>(null);
+  const { host, ntHost, ntPort, port, selectedPathTopic, sharedTable } = draft ?? sourceDraft;
 
-  const [host, setHost] = useState(settings.host);
-  const [port, setPort] = useState(String(settings.port));
-  const [ntHost, setNtHost] = useState(settings.networkTables.host);
-  const [ntPort, setNtPort] = useState(String(settings.networkTables.port));
-  const [sharedTable, setSharedTable] = useState(settings.networkTables.sharedTable);
-  const [selectedPathTopic, setSelectedPathTopic] = useState(settings.networkTables.selectedPathTopic);
-
-  useEffect(() => {
-    setHost(settings.host);
-    setPort(String(settings.port));
-    setNtHost(settings.networkTables.host);
-    setNtPort(String(settings.networkTables.port));
-    setSharedTable(settings.networkTables.sharedTable);
-    setSelectedPathTopic(settings.networkTables.selectedPathTopic);
-  }, [
-    settings.host,
-    settings.port,
-    settings.networkTables.host,
-    settings.networkTables.port,
-    settings.networkTables.sharedTable,
-    settings.networkTables.selectedPathTopic,
-  ]);
+  function updateDraft(patch: Partial<TouchscreenSettingsDraft>) {
+    setDraft((current) => ({ ...(current ?? sourceDraft), ...patch }));
+  }
 
   const nextHost = host.trim();
   const nextPort = Number(port);
@@ -72,9 +76,11 @@ export function useTouchscreenSettingsForm() {
         selectedPathTopic: nextSelectedPathTopic,
       },
     });
+    setDraft(null);
   }
 
   function onReset() {
+    setDraft(null);
     resetDefaults();
   }
 
@@ -88,12 +94,12 @@ export function useTouchscreenSettingsForm() {
     previewTopics,
     saveEnabled,
     selectedPathTopic,
-    setHost,
-    setNtHost,
-    setNtPort,
-    setPort,
-    setSelectedPathTopic,
-    setSharedTable,
+    setHost: (value: string) => updateDraft({ host: value }),
+    setNtHost: (value: string) => updateDraft({ ntHost: value }),
+    setNtPort: (value: string) => updateDraft({ ntPort: value }),
+    setPort: (value: string) => updateDraft({ port: value }),
+    setSelectedPathTopic: (value: string) => updateDraft({ selectedPathTopic: value }),
+    setSharedTable: (value: string) => updateDraft({ sharedTable: value }),
     sharedTable,
   };
 }

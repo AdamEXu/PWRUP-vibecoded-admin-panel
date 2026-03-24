@@ -7,10 +7,10 @@ import { getBridge, hasBridge, subscribeAutobahnStatus } from "@/lib/blitzRender
 
 export function ConnectionBadge() {
   const [connected, setConnected] = useState(false);
+  const bridgeAvailable = hasBridge();
 
   useEffect(() => {
-    if (!hasBridge()) {
-      setConnected(false);
+    if (!bridgeAvailable) {
       return;
     }
 
@@ -39,15 +39,15 @@ export function ConnectionBadge() {
       disposed = true;
       unsubscribe();
     };
-  }, []);
+  }, [bridgeAvailable]);
 
   return (
     <Link href="/touchscreen">
       <Badge
-        variant={connected ? "default" : "secondary"}
+        variant={bridgeAvailable && connected ? "default" : "secondary"}
         className={[
           "cursor-pointer gap-2",
-          connected
+          bridgeAvailable && connected
             ? "bg-green-600 hover:bg-green-700"
             : "bg-muted text-muted-foreground hover:bg-muted/80",
         ].join(" ")}
@@ -55,10 +55,10 @@ export function ConnectionBadge() {
         <span
           className={[
             "size-2 rounded-full",
-            connected ? "bg-green-300" : "bg-muted-foreground",
+            bridgeAvailable && connected ? "bg-green-300" : "bg-muted-foreground",
           ].join(" ")}
         />
-        {connected ? "Connected" : "Disconnected"}
+        {bridgeAvailable && connected ? "Connected" : "Disconnected"}
       </Badge>
     </Link>
   );

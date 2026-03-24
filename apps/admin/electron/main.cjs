@@ -68,12 +68,10 @@ function canConnect(url) {
 async function waitForServer(url, timeoutMs) {
   const timeoutAt = Date.now() + timeoutMs;
   while (Date.now() < timeoutAt) {
-    // eslint-disable-next-line no-await-in-loop
     if (await canConnect(url)) {
       return;
     }
 
-    // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => setTimeout(resolve, SERVER_POLL_INTERVAL_MS));
   }
 

@@ -32,6 +32,7 @@ export function usePing() {
   const [pingResults, setPingResults] = useState<Map<string, PingResult>>(new Map());
   const [isConnected, setIsConnected] = useState(false);
   const pendingPingsRef = useRef<Map<string, PendingPing>>(new Map());
+  const bridgeAvailable = hasBridge();
 
   const clearPendingPing = useCallback((piName: string, error?: Error) => {
     const pending = pendingPingsRef.current.get(piName);
@@ -42,8 +43,7 @@ export function usePing() {
   }, []);
 
   useEffect(() => {
-    if (!hasBridge()) {
-      setIsConnected(false);
+    if (!bridgeAvailable) {
       return;
     }
 
@@ -72,7 +72,7 @@ export function usePing() {
       disposed = true;
       unsubscribe();
     };
-  }, []);
+  }, [bridgeAvailable]);
 
   useEffect(() => {
     if (!hasBridge()) {
@@ -247,7 +247,7 @@ export function usePing() {
 
   return {
     pingResults,
-    isConnected,
+    isConnected: bridgeAvailable ? isConnected : false,
     sendPing,
     pingAll,
     runPingTest,

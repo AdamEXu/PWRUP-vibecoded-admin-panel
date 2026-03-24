@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 
 type SwipeDirection = "down" | "right";
 
@@ -66,16 +66,20 @@ export function useSwipeGesture({
   const rafId = useRef(0);
 
   const isDown = direction === "down";
-  const commitCallbackRef = useRef(onCommit);
-  commitCallbackRef.current = onCommit;
   const dimensionRef = useRef(dimension);
-  dimensionRef.current = dimension;
   const commitRatioRef = useRef(commitRatio);
-  commitRatioRef.current = commitRatio;
   const velocityThresholdRef = useRef(velocityThreshold);
-  velocityThresholdRef.current = velocityThreshold;
   const resetOnCommitRef = useRef(resetOnCommit);
-  resetOnCommitRef.current = resetOnCommit;
+  const commitGesture = useEffectEvent(() => {
+    onCommit();
+  });
+
+  useEffect(() => {
+    dimensionRef.current = dimension;
+    commitRatioRef.current = commitRatio;
+    velocityThresholdRef.current = velocityThreshold;
+    resetOnCommitRef.current = resetOnCommit;
+  }, [commitRatio, dimension, resetOnCommit, velocityThreshold]);
 
   const applyTransform = useCallback(
     (px: number) => {
@@ -255,7 +259,7 @@ export function useSwipeGesture({
         committed = true;
         animateTo(dim, () => {
           isSwipingRef.current = false;
-          commitCallbackRef.current();
+          commitGesture();
           // Elements that stay in DOM (e.g. right panel) need their transform reset
           // after the state update. Elements that unmount (overlay tabs) must NOT
           // reset or they'll flicker back to position 0 for one frame.

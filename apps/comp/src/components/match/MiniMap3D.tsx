@@ -153,8 +153,13 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
 
   // Load robot — use wrapper so heading (Y rotation) doesn't conflict with Z-up→Y-up (X rotation)
   const robot = useGLTFModel(ROBOT_URL, true, rigConfig.bumperNodes);
+  const robotRuntimeRef = useRef(robot);
   const jointAxisCacheRef = useRef<Map<string, THREE.Vector3>>(new Map());
   const _tmpQuat = useRef(new THREE.Quaternion());
+
+  useEffect(() => {
+    robotRuntimeRef.current = robot;
+  }, [robot]);
 
   // Recolor bumpers when alliance changes — null means no value yet, keep model color
   useEffect(() => {
@@ -171,11 +176,7 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
   const HALF_H = 4.105;
 
   // Smooth camera target (robot position, lerped)
-  const camTargetRef = useRef(new THREE.Vector3(
-    HALF_W - poseRef.current.x,
-    0,
-    poseRef.current.y - HALF_H,
-  ));
+  const camTargetRef = useRef(new THREE.Vector3());
   // Smooth camera azimuth theta
   const camThetaRef = useRef(0);
   // Current camera spherical
@@ -185,14 +186,21 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
   const camDistRef = useRef(ZOOM_FAR + mapSettings.zoom * (ZOOM_NEAR - ZOOM_FAR));
   // Always-fresh ref so useFrame never has a stale mapSettings closure
   const mapSettingsRef = useRef(mapSettings);
-  mapSettingsRef.current = mapSettings;
 
   // Reusable Vector3 for camera lerp target (avoids allocation per frame)
   const _tmpCamTarget = useRef(new THREE.Vector3());
 
+  useEffect(() => {
+    const { x, y } = poseRef.current;
+    camTargetRef.current.set(HALF_W - x, 0, y - HALF_H);
+  }, [poseRef]);
+
+  useEffect(() => {
+    mapSettingsRef.current = mapSettings;
+  }, [mapSettings]);
+
   useFrame((_, delta) => {
-    const wrapper = robot.root;
-    const inner = robot.inner;
+    const { inner, nodeMap, restPos, restQuats, root: wrapper } = robotRuntimeRef.current;
 
     // Read latest pose + joints directly from refs — no React render cycle needed.
     const { x: poseX, y: poseY, heading } = poseRef.current;
@@ -210,10 +218,10 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
     // ── Apply joints on the inner scene (which has the Z-up→Y-up rotation) ──
     if (inner) {
       for (const joint of jointValuesRef.current) {
-        const node = robot.nodeMap.get(joint.nodeName);
+        const node = nodeMap.get(joint.nodeName);
         if (!node) continue;
-        const restQuat = robot.restQuats.get(joint.nodeName);
-        const restPosVec = robot.restPos.get(joint.nodeName);
+        const restQuat = restQuats.get(joint.nodeName);
+        const restPosVec = restPos.get(joint.nodeName);
         if (!restQuat || !restPosVec) continue;
 
         let axis = jointAxisCacheRef.current.get(joint.nodeName);

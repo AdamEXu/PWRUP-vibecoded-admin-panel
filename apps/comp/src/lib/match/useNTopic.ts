@@ -21,10 +21,14 @@ export function useNTopic<T extends NetworkTablesTypes>(
   const [value, setValue] = useState<T>(defaultValue);
   const [isConnected, setIsConnected] = useState(false);
   const lastValueRef = useRef<T>(defaultValue);
+  const bridgeAvailable = hasBridge();
 
   useEffect(() => {
-    if (!hasBridge()) {
-      setIsConnected(false);
+    lastValueRef.current = defaultValue;
+  }, [defaultValue]);
+
+  useEffect(() => {
+    if (!bridgeAvailable) {
       return;
     }
 
@@ -62,7 +66,10 @@ export function useNTopic<T extends NetworkTablesTypes>(
       disposed = true;
       unsubscribe();
     };
-  }, [defaultValue, topicPath, typeInfo]);
+  }, [bridgeAvailable, defaultValue, topicPath, typeInfo]);
 
-  return { value, isConnected };
+  return {
+    value: bridgeAvailable ? value : defaultValue,
+    isConnected: bridgeAvailable ? isConnected : false,
+  };
 }

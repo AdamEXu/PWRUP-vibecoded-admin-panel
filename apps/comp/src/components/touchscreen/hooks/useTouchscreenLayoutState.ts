@@ -15,27 +15,34 @@ export function useTouchscreenLayoutState() {
   const [activeOverlayTab, setActiveOverlayTab] = useState<OverlayTabId | null>(null);
   const [prevOverlayTab, setPrevOverlayTab] = useState<OverlayTabId | null>(null);
   const [openRightPanel, setOpenRightPanel] = useState<RightPanelId | null>(null);
+  const [displayPanelId, setDisplayPanelId] = useState<RightPanelId | null>(null);
   const [isDockOpen, setIsDockOpen] = useState(false);
   const [isDockClosing, setIsDockClosing] = useState(false);
+  const [skipPanelTransition, setSkipPanelTransition] = useState(false);
   const [leftRailIcons, setLeftRailIcons] = useState<OverlayTabId[]>(DEFAULT_LEFT_RAIL_ICONS);
   const [dockIcons, setDockIcons] = useState<DockIcon[]>(() => dockIconsFromOrder(DEFAULT_DOCK_ORDER));
+  const skipTransitionFrameRef = useRef<number | null>(null);
 
   // Load persisted layout after mount to avoid SSR/client hydration mismatch
   useEffect(() => {
     const layout = loadLayoutState();
-    setLeftRailIcons(layout.leftRailIcons);
-    setDockIcons(dockIconsFromOrder(layout.dockOrder));
+    queueMicrotask(() => {
+      setLeftRailIcons(layout.leftRailIcons);
+      setDockIcons(dockIconsFromOrder(layout.dockOrder));
+    });
   }, []);
-
-  const lastPanelRef = useRef<RightPanelId | null>(null);
-  if (openRightPanel) {
-    lastPanelRef.current = openRightPanel;
-  }
 
   const isDriverBase = activeOverlayTab === null;
   const useOverlayRightPanel = isDriverBase;
-  const displayPanelId = openRightPanel ?? lastPanelRef.current;
   const rightSideWidth = openRightPanel ? 540 : 84;
+
+  useEffect(() => {
+    return () => {
+      if (skipTransitionFrameRef.current !== null) {
+        cancelAnimationFrame(skipTransitionFrameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (prevOverlayTab !== null) {
@@ -89,17 +96,31 @@ export function useTouchscreenLayoutState() {
     setActiveOverlayTab(null);
   }, []);
 
-  const togglePanel = useCallback((panelId: RightPanelId) => {
-    setIsDockClosing(true);
-    setOpenRightPanel((current) => (current === panelId ? null : panelId));
-  }, []);
+  const togglePanel = useCallback(
+    (panelId: RightPanelId) => {
+      setIsDockClosing(true);
+      if (openRightPanel === panelId) {
+        setOpenRightPanel(null);
+        return;
+      }
+      setDisplayPanelId(panelId);
+      setOpenRightPanel(panelId);
+    },
+    [openRightPanel],
+  );
 
   /** Close panel without width transition — caller already animated the slide-out. */
-  const skipPanelTransitionRef = useRef(false);
   const closePanelImmediate = useCallback(() => {
-    skipPanelTransitionRef.current = true;
+    setSkipPanelTransition(true);
     setIsDockClosing(true);
     setOpenRightPanel(null);
+    if (skipTransitionFrameRef.current !== null) {
+      cancelAnimationFrame(skipTransitionFrameRef.current);
+    }
+    skipTransitionFrameRef.current = requestAnimationFrame(() => {
+      setSkipPanelTransition(false);
+      skipTransitionFrameRef.current = null;
+    });
   }, []);
 
   const closeDock = useCallback(() => {
@@ -133,15 +154,12 @@ export function useTouchscreenLayoutState() {
     setPrevOverlayTab(null);
   }, []);
 
-  const skipTransition = skipPanelTransitionRef.current;
-  if (skipTransition) skipPanelTransitionRef.current = false;
-
   const rightPanelStyle: React.CSSProperties = {
     width: rightSideWidth,
     boxShadow: openRightPanel
       ? "inset 4px 0 0 0 #70cd35"
       : "inset 4px 0 0 0 transparent",
-    transition: skipTransition
+    transition: skipPanelTransition
       ? "none"
       : `width ${PANEL_DURATION} ${EASE}, box-shadow ${PANEL_DURATION} ${EASE}`,
     willChange: "width",
@@ -152,7 +170,7 @@ export function useTouchscreenLayoutState() {
   const appLayerStyle: React.CSSProperties = {
     left: 84,
     right: rightSideWidth,
-    transition: skipTransition ? "none" : `right ${PANEL_DURATION} ${EASE}`,
+    transition: skipPanelTransition ? "none" : `right ${PANEL_DURATION} ${EASE}`,
   };
 
   return {

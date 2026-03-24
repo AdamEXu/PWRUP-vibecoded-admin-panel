@@ -17,6 +17,7 @@ let bundledServerCwd = null;
 const serverLogBuffer = [];
 const SERVER_LOG_BUFFER_MAX = 120;
 
+
 function pushServerLog(source, chunk) {
   const text = String(chunk ?? "").replace(/\r/g, "");
   if (!text) return;

@@ -164,29 +164,27 @@ export function useRobotJoints(): RobotJointsResult {
   const ntValuesRef = useRef<Record<string, NtJointState>>({});
   const manualValuesRef = useRef(manualValues);
   const jointValuesRef = useRef<JointValue[]>([]);
-  manualValuesRef.current = manualValues; // kept fresh on every render
 
   // When manual slider values change, recompute the ref immediately.
   useEffect(() => {
+    manualValuesRef.current = manualValues;
     jointValuesRef.current = computeJointValues(ntValuesRef.current, manualValues);
   }, [manualValues]);
 
   useEffect(() => {
     if (!bridgeAvailable) {
-      setNtValues((prev) => {
-        let changed = false;
-        const next: Record<string, NtJointState> = { ...prev };
-
-        ntBackedJoints.forEach(([key]) => {
-          const existing = next[key];
-          if (existing?.isConnected) {
-            next[key] = { ...existing, isConnected: false };
-            changed = true;
-          }
-        });
-
-        return changed ? next : prev;
-      });
+      ntValuesRef.current = Object.fromEntries(
+        ntBackedJoints.map(([key]) => {
+          const existing = ntValuesRef.current[key];
+          return [
+            key,
+            existing
+              ? { ...existing, isConnected: false }
+              : { value: 0, hasValue: false, isConnected: false },
+          ];
+        }),
+      );
+      jointValuesRef.current = computeJointValues(ntValuesRef.current, manualValuesRef.current);
       return;
     }
 
@@ -233,6 +231,16 @@ export function useRobotJoints(): RobotJointsResult {
     };
   }, [bridgeAvailable]);
 
+  const effectiveNtValues = useMemo(() => {
+    if (bridgeAvailable) {
+      return ntValues;
+    }
+
+    return Object.fromEntries(
+      Object.entries(ntValues).map(([key, value]) => [key, { ...value, isConnected: false }]),
+    ) as Record<string, NtJointState>;
+  }, [bridgeAvailable, ntValues]);
+
   const resolvedValues = useMemo(() => {
     const nextValues: Record<string, number> = {};
 
@@ -241,7 +249,7 @@ export function useRobotJoints(): RobotJointsResult {
         return;
       }
 
-      const ntState = ntValues[key];
+      const ntState = effectiveNtValues[key];
       const hasLiveNtValue = Boolean(joint.ntTopic && ntState?.isConnected && ntState.hasValue);
       const fallbackValue = manualValues[key] ?? joint.defaultValue ?? 0;
       nextValues[key] = clampJointValue(joint, hasLiveNtValue ? ntState.value : fallbackValue);
@@ -260,17 +268,17 @@ export function useRobotJoints(): RobotJointsResult {
     });
 
     return nextValues;
-  }, [manualValues, ntValues]);
+  }, [effectiveNtValues, manualValues]);
 
   const liveNtByJoint = useMemo(
     () =>
       Object.fromEntries(
         ntBackedJoints.map(([key]) => {
-          const state = ntValues[key];
+          const state = effectiveNtValues[key];
           return [key, Boolean(state?.isConnected && state.hasValue)];
         }),
       ) as Record<string, boolean>,
-    [ntValues],
+    [effectiveNtValues],
   );
 
   const jointValues: JointValue[] = useMemo(

@@ -7,6 +7,10 @@ import {
   interpolateTime,
 } from "@/lib/match/matchTimeline";
 
+function getNowMs() {
+  return performance.now();
+}
+
 interface Props {
   /** Remaining seconds in current period (from NT) */
   fmsMatchTime: number;
@@ -27,11 +31,11 @@ export function MainTimer({ fmsMatchTime, totalTimeRemaining }: Props) {
   const csRef = useRef<HTMLSpanElement>(null);
 
   // Track last NT value + timestamp for interpolation
-  const lastNTRef = useRef({ value: totalTimeRemaining, timestampMs: performance.now() });
+  const lastNTRef = useRef({ value: totalTimeRemaining, timestampMs: 0 });
 
   // When NT value updates, resync the interpolation anchor
   useEffect(() => {
-    lastNTRef.current = { value: totalTimeRemaining, timestampMs: performance.now() };
+    lastNTRef.current = { value: totalTimeRemaining, timestampMs: getNowMs() };
   }, [totalTimeRemaining]);
 
   // RAF loop — directly mutates DOM text (no React re-render)
@@ -39,10 +43,11 @@ export function MainTimer({ fmsMatchTime, totalTimeRemaining }: Props) {
     let rafId: number;
 
     const tick = () => {
-      const now = performance.now();
+      const now = getNowMs();
+      const anchorTime = lastNTRef.current.timestampMs || now;
       const interpolated = interpolateTime(
         lastNTRef.current.value,
-        lastNTRef.current.timestampMs,
+        anchorTime,
         now,
       );
 

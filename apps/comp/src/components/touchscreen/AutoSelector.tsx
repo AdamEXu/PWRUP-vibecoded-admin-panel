@@ -49,8 +49,8 @@ export function AutoSelector() {
     false,
   );
 
-  const [viewingPathName, setViewingPathName] = useState<string | null>(null);
-  const [localSelectedPath, setLocalSelectedPath] = useState<string | null>(() => getStoredSelectedAuto());
+  const [requestedViewingPathName, setRequestedViewingPathName] = useState<string | null>(null);
+  const [storedSelectedPath, setStoredSelectedPath] = useState<string | null>(() => getStoredSelectedAuto());
   const [pendingPublish, setPendingPublish] = useState<string | null>(null);
   const [metadataByPathName, setMetadataByPathName] = useState<Record<string, AutoPathMetadata>>({});
   const [showConflictPopup, setShowConflictPopup] = useState(false);
@@ -64,9 +64,18 @@ export function AutoSelector() {
     () => findMatchingPathName(selectedAutoFromRobot, paths),
     [selectedAutoFromRobot, paths],
   );
+  const localSelectedPath = useMemo(() => {
+    if (storedSelectedPath === NO_AUTO_SENTINEL) {
+      return NO_AUTO_SENTINEL;
+    }
+    if (!storedSelectedPath) {
+      return null;
+    }
+    return findMatchingPathName(storedSelectedPath, paths);
+  }, [paths, storedSelectedPath]);
   const localMatchedPath = useMemo(
-    () => findMatchingPathName(localSelectedPath, paths),
-    [localSelectedPath, paths],
+    () => (localSelectedPath === NO_AUTO_SENTINEL ? null : localSelectedPath),
+    [localSelectedPath],
   );
   const normalizedRobotAuto = useMemo(() => {
     const trimmed = selectedAutoFromRobot?.trim() ?? "";
@@ -78,16 +87,15 @@ export function AutoSelector() {
     ? NO_AUTO_SENTINEL
     : (localMatchedPath ?? robotMatchedPath);
 
-  useEffect(() => {
-    if (viewingPathName) {
-      return;
+  const viewingPathName = useMemo(() => {
+    if (requestedViewingPathName === NO_AUTO_SENTINEL) {
+      return NO_AUTO_SENTINEL;
     }
-    if (activePathName) {
-      setViewingPathName(activePathName);
-    } else if (paths.length > 0) {
-      setViewingPathName(paths[0].name);
+    if (requestedViewingPathName && paths.some((entry) => entry.name === requestedViewingPathName)) {
+      return requestedViewingPathName;
     }
-  }, [activePathName, paths, viewingPathName]);
+    return activePathName ?? paths[0]?.name ?? null;
+  }, [activePathName, paths, requestedViewingPathName]);
 
   const viewingEntry = useMemo(
     () => paths.find((entry) => entry.name === viewingPathName) ?? null,
@@ -104,7 +112,6 @@ export function AutoSelector() {
     let disposed = false;
 
     if (paths.length === 0) {
-      setMetadataByPathName({});
       return;
     }
 
@@ -148,15 +155,6 @@ export function AutoSelector() {
     setStoredSelectedAuto(localSelectedPath);
   }, [localSelectedPath]);
 
-  useEffect(() => {
-    if (paths.length === 0 || !localSelectedPath || localSelectedPath === NO_AUTO_SENTINEL) {
-      return;
-    }
-    if (!localMatchedPath) {
-      setLocalSelectedPath(null);
-    }
-  }, [localMatchedPath, localSelectedPath, paths.length]);
-
   const publishDesiredAuto = useCallback(
     (pathName: string, throttle: boolean) => {
       if (isSelectionLocked) {
@@ -190,7 +188,7 @@ export function AutoSelector() {
       if (isSelectionLocked) {
         return;
       }
-      setLocalSelectedPath(pathName);
+      setStoredSelectedPath(pathName);
       publishDesiredAuto(pathName === NO_AUTO_SENTINEL ? "" : pathName, false);
     },
     [isSelectionLocked, publishDesiredAuto],
@@ -207,7 +205,9 @@ export function AutoSelector() {
     if (localSelectedPath === NO_AUTO_SENTINEL) {
       const robotIsNone = normalizedRobotAuto === "NONE";
       if (justConnected || !robotIsNone) {
-        publishDesiredAuto("", true);
+        queueMicrotask(() => {
+          publishDesiredAuto("", true);
+        });
       }
       return;
     }
@@ -217,7 +217,9 @@ export function AutoSelector() {
       normalizedRobotAuto.toLowerCase() === localSelectedPath.toLowerCase();
 
     if (justConnected || !robotAligned) {
-      publishDesiredAuto(localSelectedPath, true);
+      queueMicrotask(() => {
+        publishDesiredAuto(localSelectedPath, true);
+      });
     }
   }, [
     isConnected,
@@ -247,7 +249,9 @@ export function AutoSelector() {
       recent.push(now);
       mismatchTimestampsRef.current = recent;
       if (recent.length >= FLICKER_THRESHOLD) {
-        setShowConflictPopup(true);
+        queueMicrotask(() => {
+          setShowConflictPopup(true);
+        });
         mismatchTimestampsRef.current = [];
       }
     }
@@ -298,7 +302,10 @@ export function AutoSelector() {
                 onClick={() => {
                   setShowConflictPopup(false);
                   if (localSelectedPath) {
-                    publishDesiredAuto(localSelectedPath, false);
+                    publishDesiredAuto(
+                      localSelectedPath === NO_AUTO_SENTINEL ? "" : localSelectedPath,
+                      false,
+                    );
                   }
                 }}
               >
@@ -317,7 +324,7 @@ export function AutoSelector() {
         reload={reload}
         activePathName={activePathName}
         viewingPathName={viewingPathName}
-        onViewPath={setViewingPathName}
+        onViewPath={setRequestedViewingPathName}
 
       />
 

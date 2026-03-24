@@ -29,10 +29,10 @@ const EMPTY_SIGNAL: LaneTopicSignal = {
 export function useLaneAlignmentSignal(): LaneAlignmentSignalState {
   const [adjustingVelocity, setAdjustingVelocity] =
     useState<LaneTopicSignal>(EMPTY_SIGNAL);
+  const bridgeAvailable = hasBridge();
 
   useEffect(() => {
-    if (!hasBridge()) {
-      setAdjustingVelocity(EMPTY_SIGNAL);
+    if (!bridgeAvailable) {
       return;
     }
 
@@ -67,12 +67,23 @@ export function useLaneAlignmentSignal(): LaneAlignmentSignalState {
       disposed = true;
       cleanupAdjusting();
     };
-  }, []);
+  }, [bridgeAvailable]);
 
-  return useMemo(() => ({
-    hasValue: adjustingVelocity.hasValue,
-    value: adjustingVelocity.hasValue ? adjustingVelocity.value : null,
-    updatedAt: adjustingVelocity.updatedAt,
-    isConnected: adjustingVelocity.isConnected,
-  }), [adjustingVelocity]);
+  return useMemo(
+    () =>
+      bridgeAvailable
+        ? {
+            hasValue: adjustingVelocity.hasValue,
+            value: adjustingVelocity.hasValue ? adjustingVelocity.value : null,
+            updatedAt: adjustingVelocity.updatedAt,
+            isConnected: adjustingVelocity.isConnected,
+          }
+        : {
+            hasValue: EMPTY_SIGNAL.hasValue,
+            value: null,
+            updatedAt: EMPTY_SIGNAL.updatedAt,
+            isConnected: EMPTY_SIGNAL.isConnected,
+          },
+    [adjustingVelocity, bridgeAvailable],
+  );
 }

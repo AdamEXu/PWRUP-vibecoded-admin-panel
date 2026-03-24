@@ -6,6 +6,14 @@ import { Address, AutobahnClient } from "autobahn-client";
 import { Ping, Pong } from "@pwrup/shared-proto/status/PiStatus";
 import { useSettings } from "@/lib/settings";
 
+function getClientConnectionState(client: AutobahnClient) {
+  try {
+    return client.isConnected();
+  } catch {
+    return false;
+  }
+}
+
 export interface PingResult {
   piName: string;
   latency: number; // in milliseconds
@@ -33,7 +41,7 @@ export function usePing() {
   const [pingResults, setPingResults] = useState<Map<string, PingResult>>(
     new Map()
   );
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(() => getClientConnectionState(client));
   const pendingPingsRef = useRef<Map<string, PendingPing>>(new Map()); // piName -> pending ping info
   const pongSubscriptionRef = useRef<string | null>(null);
 
@@ -47,35 +55,19 @@ export function usePing() {
 
   // Initialize connection
   useEffect(() => {
-    let cancelled = false;
-
-    const checkConnection = () => {
-      if (cancelled) return;
-      try {
-        const connected = client.isConnected();
-        setIsConnected(connected);
-        return connected;
-      } catch {
+    void Promise.resolve()
+      .then(() => client.begin())
+      .catch((error) => {
+        console.error("[Ping] Error starting connection:", error);
         setIsConnected(false);
-        return false;
-      }
-    };
-
-    try {
-      client.begin();
-    } catch (error) {
-      console.error("[Ping] Error starting connection:", error);
-      setIsConnected(false);
-    }
-
-    checkConnection();
+      });
 
     const intervalId = setInterval(() => {
-      checkConnection();
+      const connected = getClientConnectionState(client);
+      setIsConnected((prev) => (prev !== connected ? connected : prev));
     }, 500);
 
     return () => {
-      cancelled = true;
       clearInterval(intervalId);
     };
   }, [client]);

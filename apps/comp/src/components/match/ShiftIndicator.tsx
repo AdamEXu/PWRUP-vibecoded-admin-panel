@@ -4,6 +4,10 @@ import { useEffect, useRef } from "react";
 import type { AimMode, HubStatus, MatchPhase } from "@/lib/match/types";
 import { HubStatusIcon } from "./HubStatusIcon";
 
+function getNowMs() {
+  return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
 interface Props {
   hubStatus: HubStatus;
   aimMode: AimMode;
@@ -35,9 +39,6 @@ export function ShiftIndicator({
   showBuffer,
   showShiftIndicator,
 }: Props) {
-  const nowMs = () =>
-    typeof performance !== "undefined" ? performance.now() : Date.now();
-
   const inEndgame = matchPhase === "endgame";
   const inAuto = matchPhase === "autonomous";
   const inTransition = matchPhase === "transition";
@@ -55,20 +56,23 @@ export function ShiftIndicator({
   const snapshotRef = useRef({
     display: baseDisplayTime,
     buffer: baseBufferTime,
-    timestampMs: nowMs(),
+    timestampMs: 0,
   });
 
   useEffect(() => {
     snapshotRef.current = {
       display: baseDisplayTime,
       buffer: baseBufferTime,
-      timestampMs: nowMs(),
+      timestampMs: getNowMs(),
     };
   }, [baseDisplayTime, baseBufferTime]);
 
   // Up-to-date props readable from RAF loop without stale closure
   const liveRef = useRef({ hubStatus, showBuffer });
-  liveRef.current = { hubStatus, showBuffer };
+
+  useEffect(() => {
+    liveRef.current = { hubStatus, showBuffer };
+  }, [hubStatus, showBuffer]);
 
   // DOM refs for imperative text updates — no React re-render per frame
   const intPartRef = useRef<HTMLSpanElement>(null);
@@ -80,7 +84,7 @@ export function ShiftIndicator({
     let rafId: number;
 
     const tick = () => {
-      const now = nowMs();
+      const now = getNowMs();
       const { display, buffer, timestampMs } = snapshotRef.current;
       const { hubStatus: liveHubStatus, showBuffer: liveShowBuffer } = liveRef.current;
 

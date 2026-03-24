@@ -31,6 +31,8 @@ export function usePathNetworkTable(): PathNetworkTableState {
     () => settings.networkTables.host.trim(),
     [settings.networkTables.host],
   );
+  const bridgeAvailable = hasBridge();
+  const canSubscribe = bridgeAvailable && robotIp.length > 0;
 
   const { requestTopic: requestTopicPath, stateTopic: stateTopicPath } = useMemo(
     () =>
@@ -48,7 +50,7 @@ export function usePathNetworkTable(): PathNetworkTableState {
   }, []);
 
   const flushQueuedRequest = useCallback(async () => {
-    if (!queuedRequestRef.current || !hasBridge() || !isConnected) {
+    if (!queuedRequestRef.current || !hasBridge()) {
       return;
     }
 
@@ -65,13 +67,10 @@ export function usePathNetworkTable(): PathNetworkTableState {
     if (queuedRequestRef.current === nextValue) {
       queuedRequestRef.current = null;
     }
-  }, [isConnected, requestTopicPath]);
+  }, [requestTopicPath]);
 
   useEffect(() => {
-    if (!robotIp || !hasBridge()) {
-      setIsConnected(false);
-      setSelectedAutoFromRobot(null);
-      setLastUpdatedMs(Date.now());
+    if (!canSubscribe) {
       return;
     }
 
@@ -100,6 +99,12 @@ export function usePathNetworkTable(): PathNetworkTableState {
         const trimmed = update.value.trim();
         setSelectedAutoFromRobot(!trimmed || trimmed.toUpperCase() === "NONE" ? null : trimmed);
         setLastUpdatedMs(Date.now());
+        if (queuedRequestRef.current !== null) {
+          void flushQueuedRequest().catch((error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            setPublishError(message);
+          });
+        }
       },
     ).then((cleanup) => {
       if (disposed) {
@@ -113,14 +118,14 @@ export function usePathNetworkTable(): PathNetworkTableState {
       disposed = true;
       unsubscribe();
     };
-  }, [robotIp, stateTopicPath]);
+  }, [canSubscribe, flushQueuedRequest, stateTopicPath]);
 
   const publishSelectedAuto = useCallback(
     async (autoName: string) => {
       queuedRequestRef.current = normalizeAutoName(autoName);
       setPublishError(null);
 
-      if (!isConnected || !hasBridge()) {
+      if (!canSubscribe || !isConnected) {
         return;
       }
 
@@ -132,26 +137,17 @@ export function usePathNetworkTable(): PathNetworkTableState {
         throw error;
       }
     },
-    [flushQueuedRequest, isConnected, normalizeAutoName],
+    [canSubscribe, flushQueuedRequest, isConnected, normalizeAutoName],
   );
-
-  useEffect(() => {
-    if (!isConnected || queuedRequestRef.current === null) return;
-
-    void flushQueuedRequest().catch((error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      setPublishError(message);
-    });
-  }, [flushQueuedRequest, isConnected]);
 
   return {
     robotIp,
     topic,
     requestTopic: requestTopicPath,
     stateTopic: stateTopicPath,
-    isConnected,
-    selectedAutoFromRobot,
-    lastUpdatedMs,
+    isConnected: canSubscribe ? isConnected : false,
+    selectedAutoFromRobot: canSubscribe ? selectedAutoFromRobot : null,
+    lastUpdatedMs: canSubscribe ? lastUpdatedMs : null,
     publishSelectedAuto,
     lastPublishMs,
     publishError,

@@ -6,13 +6,21 @@ import { Address, AutobahnClient } from "autobahn-client";
 import { useSettings } from "@/lib/settings";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 
+function getClientConnectionState(client: AutobahnClient) {
+  try {
+    return client.isConnected();
+  } catch {
+    return false;
+  }
+}
+
 export function ConnectionBadge() {
   const { settings } = useSettings();
   const client = useMemo(
     () => new AutobahnClient(new Address(settings.host, settings.port)),
     [settings.host, settings.port]
   );
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(() => getClientConnectionState(client));
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -67,13 +75,6 @@ export function ConnectionBadge() {
       originalConsoleError(...args);
     };
 
-    // reflect current state immediately if available
-    try {
-      setConnected(client.isConnected());
-    } catch {
-      setConnected(false);
-    }
-
     // attempt to connect and set when resolved/rejected
     // Wrap in try-catch to prevent errors from propagating
     Promise.resolve()
@@ -87,11 +88,7 @@ export function ConnectionBadge() {
       })
       .then(() => {
         if (!cancelled) {
-          try {
-            setConnected(client.isConnected());
-          } catch {
-            setConnected(false);
-          }
+          setConnected(getClientConnectionState(client));
         }
       })
       .catch(() => {
@@ -103,12 +100,8 @@ export function ConnectionBadge() {
 
     // poll isConnected periodically to reflect live state
     pollRef.current = window.setInterval(() => {
-      try {
-        const state = client.isConnected();
-        setConnected((prev) => (prev !== state ? state : prev));
-      } catch {
-        setConnected(false);
-      }
+      const state = getClientConnectionState(client);
+      setConnected((prev) => (prev !== state ? state : prev));
     }, 1000);
 
     return () => {
