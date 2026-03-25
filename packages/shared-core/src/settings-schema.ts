@@ -9,6 +9,7 @@ export interface ConnectionSettings {
   host: string;
   port: number;
   networkTables: NetworkTablesSettings;
+  reconnectTimeoutSeconds: number;
 }
 
 export interface HudVisibilitySettings {
@@ -49,6 +50,7 @@ export const DEFAULTS: ConnectionSettings = {
     sharedTable: "Shared",
     selectedPathTopic: "PathPlanner/SelectedPath",
   },
+  reconnectTimeoutSeconds: 10,
 };
 
 export const DEFAULT_HUD_VISIBILITY: HudVisibilitySettings = {

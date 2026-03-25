@@ -47,6 +47,14 @@ function normalizeSettings(next: Partial<ConnectionSettings>): ConnectionSetting
       ? nt.selectedPathTopic.trim().replace(/^\/+|\/+$/g, "")
       : DEFAULTS.networkTables.selectedPathTopic;
 
+  const reconnectTimeoutSeconds =
+    typeof next.reconnectTimeoutSeconds === "number" &&
+    Number.isFinite(next.reconnectTimeoutSeconds) &&
+    next.reconnectTimeoutSeconds >= 2 &&
+    next.reconnectTimeoutSeconds <= 60
+      ? Math.round(next.reconnectTimeoutSeconds)
+      : DEFAULTS.reconnectTimeoutSeconds;
+
   return {
     host,
     port,
@@ -56,6 +64,7 @@ function normalizeSettings(next: Partial<ConnectionSettings>): ConnectionSetting
       sharedTable,
       selectedPathTopic,
     },
+    reconnectTimeoutSeconds,
   };
 }
 

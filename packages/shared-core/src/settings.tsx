@@ -130,6 +130,14 @@ function normalizeSettings(parsed: Partial<ConnectionSettings>): ConnectionSetti
     ? frcTeamToRobotIp(legacyTeamNumber, legacyRobotIpLastOctet)
     : nextNtHost;
 
+  const reconnectTimeoutSeconds =
+    typeof parsed.reconnectTimeoutSeconds === "number" &&
+    Number.isFinite(parsed.reconnectTimeoutSeconds) &&
+    parsed.reconnectTimeoutSeconds >= 2 &&
+    parsed.reconnectTimeoutSeconds <= 60
+      ? Math.round(parsed.reconnectTimeoutSeconds)
+      : DEFAULTS.reconnectTimeoutSeconds;
+
   return {
     host: typeof parsed.host === "string" && parsed.host.trim().length > 0 ? parsed.host.trim() : DEFAULTS.host,
     port:
@@ -142,6 +150,7 @@ function normalizeSettings(parsed: Partial<ConnectionSettings>): ConnectionSetti
       sharedTable: nextSharedTable,
       selectedPathTopic: nextSelectedEntry,
     },
+    reconnectTimeoutSeconds,
   };
 }
 
