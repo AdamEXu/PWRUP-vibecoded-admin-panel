@@ -12,6 +12,7 @@ const DEFAULTS = {
     sharedTable: "PathPlanner",
     selectedPathTopic: "SelectedPath",
   },
+  reconnectTimeoutSeconds: 10,
 };
 
 const DEFAULT_HUD_VISIBILITY = {
@@ -49,9 +50,18 @@ function normalizeConnectionSettings(next = {}) {
       ? Math.round(networkTables.port)
       : DEFAULTS.networkTables.port;
 
+  const reconnectTimeoutSeconds =
+    typeof next.reconnectTimeoutSeconds === "number" &&
+    Number.isFinite(next.reconnectTimeoutSeconds) &&
+    next.reconnectTimeoutSeconds >= 2 &&
+    next.reconnectTimeoutSeconds <= 60
+      ? Math.round(next.reconnectTimeoutSeconds)
+      : DEFAULTS.reconnectTimeoutSeconds;
+
   return {
     host: typeof next.host === "string" && next.host.trim().length > 0 ? next.host.trim() : DEFAULTS.host,
     port,
+    reconnectTimeoutSeconds,
     networkTables: {
       host:
         typeof networkTables.host === "string" && networkTables.host.trim().length > 0

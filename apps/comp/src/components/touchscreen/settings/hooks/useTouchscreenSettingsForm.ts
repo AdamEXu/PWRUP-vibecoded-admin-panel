@@ -10,6 +10,7 @@ export function useTouchscreenSettingsForm() {
   const [ntPort, setNtPort] = useState(String(settings.networkTables.port));
   const [sharedTable, setSharedTable] = useState(settings.networkTables.sharedTable);
   const [selectedPathTopic, setSelectedPathTopic] = useState(settings.networkTables.selectedPathTopic);
+  const [reconnectTimeoutSeconds, setReconnectTimeoutSeconds] = useState(settings.reconnectTimeoutSeconds);
 
   useEffect(() => {
     setHost(settings.host);
@@ -18,6 +19,7 @@ export function useTouchscreenSettingsForm() {
     setNtPort(String(settings.networkTables.port));
     setSharedTable(settings.networkTables.sharedTable);
     setSelectedPathTopic(settings.networkTables.selectedPathTopic);
+    setReconnectTimeoutSeconds(settings.reconnectTimeoutSeconds);
   }, [
     settings.host,
     settings.port,
@@ -25,6 +27,7 @@ export function useTouchscreenSettingsForm() {
     settings.networkTables.port,
     settings.networkTables.sharedTable,
     settings.networkTables.selectedPathTopic,
+    settings.reconnectTimeoutSeconds,
   ]);
 
   const nextHost = host.trim();
@@ -48,7 +51,8 @@ export function useTouchscreenSettingsForm() {
     nextNtHost !== settings.networkTables.host ||
     Math.round(nextNtPort) !== settings.networkTables.port ||
     nextSharedTable !== settings.networkTables.sharedTable ||
-    nextSelectedPathTopic !== settings.networkTables.selectedPathTopic;
+    nextSelectedPathTopic !== settings.networkTables.selectedPathTopic ||
+    Math.round(reconnectTimeoutSeconds) !== settings.reconnectTimeoutSeconds;
 
   const saveEnabled = canSave && hasChanges;
 
@@ -71,6 +75,7 @@ export function useTouchscreenSettingsForm() {
         sharedTable: nextSharedTable,
         selectedPathTopic: nextSelectedPathTopic,
       },
+      reconnectTimeoutSeconds: Math.round(reconnectTimeoutSeconds),
     });
   }
 
@@ -86,12 +91,14 @@ export function useTouchscreenSettingsForm() {
     onSave,
     port,
     previewTopics,
+    reconnectTimeoutSeconds,
     saveEnabled,
     selectedPathTopic,
     setHost,
     setNtHost,
     setNtPort,
     setPort,
+    setReconnectTimeoutSeconds,
     setSelectedPathTopic,
     setSharedTable,
     sharedTable,

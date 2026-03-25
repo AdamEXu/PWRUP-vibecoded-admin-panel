@@ -13,6 +13,8 @@ class NtBroker extends EventEmitter {
     this.subscriptions = new Map();
     this.topicEntries = new Map();
     this.publisherEntries = new Map();
+    this.watchdogHandle = null;
+    this.connectAttemptStart = null;
   }
 
   initialize(snapshot) {
@@ -121,6 +123,7 @@ class NtBroker extends EventEmitter {
       this.removeConnectionListener = null;
     }
 
+    this.#stopWatchdog();
     this.client = null;
     this.clientKey = "";
     this.isConnected = false;
@@ -169,6 +172,8 @@ class NtBroker extends EventEmitter {
     this.removeConnectionListener = this.client.addRobotConnectionListener((connected) => {
       this.#setConnectionState(connected);
     }, true);
+
+    this.#startWatchdog();
   }
 
   #rebindClient() {
@@ -181,6 +186,7 @@ class NtBroker extends EventEmitter {
     });
 
     this.publisherEntries.clear();
+    this.#stopWatchdog();
     this.client = null;
     this.clientKey = "";
 
@@ -220,6 +226,46 @@ class NtBroker extends EventEmitter {
 
     entry.topic = topic;
     entry.subUid = subUid;
+  }
+
+  #startWatchdog() {
+    this.#stopWatchdog();
+    this.connectAttemptStart = null;
+    this.watchdogHandle = setInterval(() => {
+      if (!this.client) return;
+      try {
+        const socket = this.client.client?.messenger?.socket;
+        if (!socket) return;
+        if (this.isConnected) {
+          this.connectAttemptStart = null;
+          return;
+        }
+        if (socket.readyState === 0 /* CONNECTING */) {
+          if (this.connectAttemptStart === null) {
+            this.connectAttemptStart = Date.now();
+          } else {
+            const timeoutMs = (this.snapshot?.settings?.reconnectTimeoutSeconds ?? 10) * 1000;
+            if (Date.now() - this.connectAttemptStart >= timeoutMs) {
+              this.connectAttemptStart = null;
+              try { socket.close(); } catch { /* ignore */ }
+            }
+          }
+        } else {
+          this.connectAttemptStart = null;
+        }
+      } catch {
+        // ignore watchdog errors
+      }
+    }, 1000);
+    this.watchdogHandle.unref?.();
+  }
+
+  #stopWatchdog() {
+    if (this.watchdogHandle) {
+      clearInterval(this.watchdogHandle);
+      this.watchdogHandle = null;
+    }
+    this.connectAttemptStart = null;
   }
 
   #setConnectionState(connected) {

@@ -47,6 +47,7 @@ class AutobahnBroker extends EventEmitter {
     this.statusPollHandle = null;
     this.retryDelay = 2000;
     this.retryHandle = null;
+    this.connectAttemptStart = null;
     this.nextSubscriptionId = 1;
     this.subscriptions = new Map();
     this.topicEntries = new Map();
@@ -237,17 +238,41 @@ class AutobahnBroker extends EventEmitter {
       this.#setConnectionState(connected);
 
       if (connected) {
+        this.connectAttemptStart = null;
         this.retryDelay = 2000;
         if (this.retryHandle) {
           clearTimeout(this.retryHandle);
           this.retryHandle = null;
         }
-      } else if (!this.retryHandle) {
-        this.retryHandle = setTimeout(() => {
-          this.retryHandle = null;
-          this.#attemptReconnect();
-        }, this.retryDelay);
-        this.retryDelay = Math.min(this.retryDelay * 2, 30_000);
+      } else {
+        // Watchdog: if the WebSocket is stuck in CONNECTING, close it after timeout
+        const ws = this.client?.ws;
+        if (ws && ws.readyState === 0 /* CONNECTING */) {
+          if (this.connectAttemptStart === null) {
+            this.connectAttemptStart = Date.now();
+          } else {
+            const timeoutMs = (this.snapshot?.settings?.reconnectTimeoutSeconds ?? 10) * 1000;
+            if (Date.now() - this.connectAttemptStart >= timeoutMs) {
+              this.connectAttemptStart = null;
+              this.retryDelay = 2000;
+              if (this.retryHandle) {
+                clearTimeout(this.retryHandle);
+                this.retryHandle = null;
+              }
+              try { ws.close(); } catch { /* ignore */ }
+            }
+          }
+        } else {
+          this.connectAttemptStart = null;
+        }
+
+        if (!this.retryHandle) {
+          this.retryHandle = setTimeout(() => {
+            this.retryHandle = null;
+            this.#attemptReconnect();
+          }, this.retryDelay);
+          this.retryDelay = Math.min(this.retryDelay * 2, 30_000);
+        }
       }
     }, 250);
     this.statusPollHandle.unref?.();

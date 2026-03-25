@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getBridge, hasBridge, subscribeAutobahnStatus } from "@/lib/blitzRenderer";
+import { CustomSlider } from "./components/panels/CustomSlider";
 import { NetworkTablesPreview } from "./settings/components/NetworkTablesPreview";
 import { SettingsColumn } from "./settings/components/SettingsColumn";
 import { SettingsField } from "./settings/components/SettingsField";
@@ -17,12 +18,14 @@ export function TouchscreenSettingsPanel() {
     onSave,
     port,
     previewTopics,
+    reconnectTimeoutSeconds,
     saveEnabled,
     selectedPathTopic,
     setHost,
     setNtHost,
     setNtPort,
     setPort,
+    setReconnectTimeoutSeconds,
     setSelectedPathTopic,
     setSharedTable,
     sharedTable,
@@ -126,6 +129,19 @@ export function TouchscreenSettingsPanel() {
             value={selectedPathTopic}
             onChange={setSelectedPathTopic}
             placeholder="SelectedPath"
+          />
+        </SettingsColumn>
+
+        <SettingsColumn title="Connection">
+          <CustomSlider
+            label="Reconnect Timeout"
+            value={reconnectTimeoutSeconds}
+            onChange={setReconnectTimeoutSeconds}
+            min={2}
+            max={30}
+            step={1}
+            decimals={0}
+            valueLabel="{{v}}s — close stuck connections after this many seconds"
           />
         </SettingsColumn>
 
