@@ -25,7 +25,7 @@ interface CustomSliderProps {
 }
 
 export function CustomSlider({
-  value,
+  value: rawValue,
   onChange,
   label,
   hints,
@@ -39,6 +39,7 @@ export function CustomSlider({
   reversed = false,
   disabled = false,
 }: CustomSliderProps) {
+  const value = rawValue ?? min;
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartX = useRef(0);
