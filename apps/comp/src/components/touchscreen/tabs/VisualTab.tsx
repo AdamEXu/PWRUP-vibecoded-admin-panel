@@ -23,10 +23,10 @@ const BLUR_OPTIONS: SelectorOption[] = [
 const RENDER_SCALE_SNAP_POINTS = [0.25, 0.5, 0.75, 1.0];
 
 const RENDER_SCALE_HINTS: SliderHintRange[] = [
-  { min: 0,    max: 1, label: "0.25× — quarter resolution, for struggling hardware" },
-  { min: 0.4,  max: 1, label: "0.5× — half resolution, big perf gain with moderate quality loss" },
-  { min: 0.62, max: 1, label: "0.75× — three-quarter resolution, barely noticeable quality loss" },
-  { min: 0.87, max: 1, label: "1× — native resolution, full quality" },
+  { min: 0,    max: 1, label: "0.25x: for struggling hardware" },
+  { min: 0.4,  max: 1, label: "0.5x: moderate quality loss" },
+  { min: 0.62, max: 1, label: "0.75: barely noticeable quality loss" },
+  { min: 0.87, max: 1, label: "1: native resolution, full quality" },
 ];
 
 function broadcastReload() {
