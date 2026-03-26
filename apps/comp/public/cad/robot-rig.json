@@ -7,6 +7,17 @@
     "position": [0, 0, 0]
   },
   "joints": {
+    "index_wrist": {
+      "nodeName": "IndexWristRControl",
+      "type": "revolute",
+      "axis": [1, 0, 0],
+      "limits": { "min": -2.22, "max": 0.02 },
+      "defaultValue": 0,
+      "ntTopic": "/AdvantageKit/RealOutputs/IntakeSubsystem/WristPosition",
+      "inputTransform": { "scale": -7.368421052631579, "offset": 0.38842105263157894 },
+      "description": "Index wrist pivot",
+      "debugSlider": { "label": "Index Wrist", "step": 0.01 }
+    },
     "turret": {
       "nodeName": "TurretRControl",
       "type": "revolute",
@@ -32,9 +43,10 @@
       "nodeName": "ClimberControlInner",
       "type": "prismatic",
       "axis": [0, 0, 1],
-      "limits": { "min": 0, "max": 0.61 },
+      "limits": { "min": -0.31, "max": 0 },
       "defaultValue": 0,
       "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentPosition",
+      "inputTransform": { "scale": 0.9904153354632587, "offset": -0.31 },
       "description": "Climber inner stage",
       "debugSlider": { "label": "Climber Inner", "step": 0.01 }
     },
@@ -46,16 +58,6 @@
       "defaultValue": 0,
       "description": "Climber outer stage mirrors the inner stage in the opposite direction",
       "link": { "source": "climber_inner", "scale": -1, "offset": 0 }
-    },
-    "index_wrist": {
-      "nodeName": "IndexWristRControl",
-      "type": "revolute",
-      "axis": [1, 0, 0],
-      "limits": { "min": -3.14, "max": 3.14 },
-      "defaultValue": 0,
-      "ntTopic": "/AdvantageKit/RealOutputs/IntakeSubsystem/WristPosition",
-      "description": "Index wrist pivot",
-      "debugSlider": { "label": "Index Wrist", "step": 0.01 }
     }
   }
 }
