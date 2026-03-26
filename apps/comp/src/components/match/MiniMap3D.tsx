@@ -170,6 +170,9 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
   const HALF_W = 8.27;
   const HALF_H = 4.105;
 
+  // Display pose: smoothed version of poseRef for rendering (adaptive lerp)
+  const displayPoseRef = useRef({ x: poseRef.current.x, y: poseRef.current.y, heading: poseRef.current.heading });
+
   // Smooth camera target (robot position, lerped)
   const camTargetRef = useRef(new THREE.Vector3(
     HALF_W - poseRef.current.x,
@@ -194,8 +197,28 @@ function Scene({ poseRef, jointValuesRef, isRedAlliance }: SceneProps) {
     const wrapper = robot.root;
     const inner = robot.inner;
 
-    // Read latest pose + joints directly from refs — no React render cycle needed.
-    const { x: poseX, y: poseY, heading } = poseRef.current;
+    // Smooth pose: adaptive lerp toward raw pose — fast for real movement, slow for vibration.
+    // Snaps immediately if the jump is > TELEPORT_THRESHOLD (vision reacquisition after loss).
+    const TELEPORT_THRESHOLD = 1.5; // meters
+    const LERP_MIN = 0.15;          // floor lerp rate (heavy damping for small vibrations)
+    const LERP_SCALE = 1.4;         // ramp rate: lerp increases linearly with distance
+    {
+      const { x: rawX, y: rawY, heading: rawHeading } = poseRef.current;
+      const dx = rawX - displayPoseRef.current.x;
+      const dy = rawY - displayPoseRef.current.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > TELEPORT_THRESHOLD) {
+        displayPoseRef.current = { x: rawX, y: rawY, heading: rawHeading };
+      } else {
+        const t = dtLerp(Math.min(LERP_MIN + dist * LERP_SCALE, 0.95), delta);
+        displayPoseRef.current = {
+          x: displayPoseRef.current.x + dx * t,
+          y: displayPoseRef.current.y + dy * t,
+          heading: lerpAngle(displayPoseRef.current.heading, rawHeading, t),
+        };
+      }
+    }
+    const { x: poseX, y: poseY, heading } = displayPoseRef.current;
     const robotWorldX = HALF_W - poseX;
     const robotWorldZ = poseY - HALF_H;
 
