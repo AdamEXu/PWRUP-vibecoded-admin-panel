@@ -45,7 +45,7 @@
       "axis": [0, 0, 1],
       "limits": { "min": -0.31, "max": 0 },
       "defaultValue": 0,
-      "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentPosition",
+      "ntTopic": "/AdvantageKit/RealOutputs/Climber/CurrentHeightMeters",
       "inputTransform": { "scale": 0.9904153354632587, "offset": -0.31 },
       "description": "Climber inner stage",
       "debugSlider": { "label": "Climber Inner", "step": 0.01 }
