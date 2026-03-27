@@ -62,21 +62,25 @@ export function TouchscreenDashboard() {
 
   const activeOverlayRef = useRef<HTMLDivElement>(null);
 
-  const PANEL_TRANSITION = "right 200ms cubic-bezier(0.25, 0.1, 0.25, 1)";
-
-  const onPanelSwipeProgress = useCallback((delta: number, animated: boolean) => {
-    const el = activeOverlayRef.current;
-    if (!el) return;
-    el.style.transition = animated ? PANEL_TRANSITION : "none";
-    el.style.right = `${540 - delta}px`;
-  }, []);
-
-  const onPanelSwipeReset = useCallback(() => {
-    const el = activeOverlayRef.current;
-    if (!el) return;
-    el.style.transition = "";
-    el.style.right = "";
-  }, []);
+  const { ref: panelSwipeRef } = useSwipeGesture({
+    direction: "right",
+    dimension: 456, // content width (540 - 84), icon column stays at screen edge
+    onCommit: closePanelImmediate,
+    enabled: openRightPanel !== null,
+    resetOnCommit: true,
+    onProgress: (delta, animated) => {
+      const el = activeOverlayRef.current;
+      if (!el) return;
+      el.style.transition = animated ? "right 200ms cubic-bezier(0.25, 0.1, 0.25, 1)" : "none";
+      el.style.right = `${540 - delta}px`;
+    },
+    onReset: () => {
+      const el = activeOverlayRef.current;
+      if (!el) return;
+      el.style.transition = "";
+      el.style.right = "";
+    },
+  });
 
   const { ref: swipeDownRef } = useSwipeGesture({
     direction: "down",
@@ -156,9 +160,7 @@ export function TouchscreenDashboard() {
         openPanel={openRightPanel}
         displayPanel={displayPanelId}
         onToggle={togglePanel}
-        onSwipeClose={closePanelImmediate}
-        onSwipeProgress={onPanelSwipeProgress}
-        onSwipeReset={onPanelSwipeReset}
+        swipeRef={panelSwipeRef}
         style={rightPanelStyle}
       />
 
