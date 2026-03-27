@@ -16,6 +16,10 @@ interface UseSwipeGestureOptions {
   velocityThreshold?: number;
   /** If true, reset transform after commit (for elements that stay in DOM). Default false. */
   resetOnCommit?: boolean;
+  /** Called during drag with current delta (animated=false), or before a commit/snap-back animation starts (animated=true). */
+  onProgress?: (delta: number, animated: boolean) => void;
+  /** Called after snap-back animation ends so caller can restore DOM state. */
+  onReset?: () => void;
 }
 
 interface TouchSample {
@@ -50,6 +54,8 @@ export function useSwipeGesture({
   commitRatio = 0.35,
   velocityThreshold = 0.5,
   resetOnCommit = false,
+  onProgress,
+  onReset,
 }: UseSwipeGestureOptions) {
   const ref = useRef<HTMLDivElement>(null);
   const isSwipingRef = useRef(false);
@@ -76,6 +82,10 @@ export function useSwipeGesture({
   velocityThresholdRef.current = velocityThreshold;
   const resetOnCommitRef = useRef(resetOnCommit);
   resetOnCommitRef.current = resetOnCommit;
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
+  const onResetRef = useRef(onReset);
+  onResetRef.current = onReset;
 
   const applyTransform = useCallback(
     (px: number) => {
@@ -218,6 +228,7 @@ export function useSwipeGesture({
       cancelAnimationFrame(rafId.current);
       rafId.current = requestAnimationFrame(() => {
         applyTransform(delta.current);
+        onProgressRef.current?.(delta.current, false);
       });
     };
 
@@ -253,6 +264,7 @@ export function useSwipeGesture({
 
       if (pastThreshold || fastFlick) {
         committed = true;
+        onProgressRef.current?.(dim, true);
         animateTo(dim, () => {
           isSwipingRef.current = false;
           commitCallbackRef.current();
@@ -271,8 +283,10 @@ export function useSwipeGesture({
         });
       } else {
         // Snap back
+        onProgressRef.current?.(0, true);
         animateTo(0, () => {
           resetElement();
+          onResetRef.current?.();
         });
       }
     };

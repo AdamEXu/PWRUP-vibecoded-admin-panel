@@ -1,7 +1,7 @@
 "use client";
 
 import { DndContext, DragOverlay } from "@dnd-kit/core";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ConnectionLost } from "../match/ConnectionLost";
 import { LeftRail } from "./components/chrome/LeftRail";
 import { RightPanel } from "./components/chrome/RightPanel";
@@ -60,6 +60,24 @@ export function TouchscreenDashboard() {
     if (activeOverlayTab !== null) setEntryAnimDone(false);
   }
 
+  const activeOverlayRef = useRef<HTMLDivElement>(null);
+
+  const PANEL_TRANSITION = "right 200ms cubic-bezier(0.25, 0.1, 0.25, 1)";
+
+  const onPanelSwipeProgress = useCallback((delta: number, animated: boolean) => {
+    const el = activeOverlayRef.current;
+    if (!el) return;
+    el.style.transition = animated ? PANEL_TRANSITION : "none";
+    el.style.right = `${540 - delta}px`;
+  }, []);
+
+  const onPanelSwipeReset = useCallback(() => {
+    const el = activeOverlayRef.current;
+    if (!el) return;
+    el.style.transition = "";
+    el.style.right = "";
+  }, []);
+
   const { ref: swipeDownRef } = useSwipeGesture({
     direction: "down",
     dimension: typeof window !== "undefined" ? window.innerHeight : 800,
@@ -100,7 +118,11 @@ export function TouchscreenDashboard() {
 
       {activeOverlayTab !== null && (
         <div
-          ref={swipeDownRef}
+          ref={(el) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (swipeDownRef as any).current = el;
+            activeOverlayRef.current = el;
+          }}
           key={`enter-${activeOverlayTab}`}
           className={[
             "fixed top-0 bottom-0 z-10 bg-black will-change-transform",
@@ -135,6 +157,8 @@ export function TouchscreenDashboard() {
         displayPanel={displayPanelId}
         onToggle={togglePanel}
         onSwipeClose={closePanelImmediate}
+        onSwipeProgress={onPanelSwipeProgress}
+        onSwipeReset={onPanelSwipeReset}
         style={rightPanelStyle}
       />
 

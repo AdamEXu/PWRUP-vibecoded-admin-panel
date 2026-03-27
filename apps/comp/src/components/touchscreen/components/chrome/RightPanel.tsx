@@ -10,6 +10,8 @@ export function RightPanel({
   displayPanel,
   onToggle,
   onSwipeClose,
+  onSwipeProgress,
+  onSwipeReset,
   style,
 }: {
   useOverlayRightPanel: boolean;
@@ -17,6 +19,8 @@ export function RightPanel({
   displayPanel: RightPanelId | null;
   onToggle: (id: RightPanelId) => void;
   onSwipeClose: () => void;
+  onSwipeProgress?: (delta: number, animated: boolean) => void;
+  onSwipeReset?: () => void;
   style: React.CSSProperties;
 }) {
   const { visualSettings } = useSettings();
@@ -28,6 +32,8 @@ export function RightPanel({
     onCommit: onSwipeClose,
     enabled: openPanel !== null,
     resetOnCommit: true,
+    onProgress: onSwipeProgress,
+    onReset: onSwipeReset,
   });
 
   return (
