@@ -277,6 +277,9 @@ export function useSwipeGesture({
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
                 resetElement();
+                // Restore any React-managed styles that resetElement() cleared
+                // (React won't re-apply them since its vDOM is unchanged).
+                onResetRef.current?.();
               });
             });
           }
