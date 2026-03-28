@@ -17,7 +17,7 @@ import { useTouchscreenDnd } from "./hooks/useTouchscreenDnd";
 import { useSwipeGesture } from "./hooks/useSwipeGesture";
 import { useTouchscreenLayoutState } from "./hooks/useTouchscreenLayoutState";
 import { usePathNetworkTable } from "@/lib/hooks/usePathNetworkTable";
-import { TOUCHSCREEN_DND_CONTEXT_ID } from "./model";
+import { TOUCHSCREEN_DND_CONTEXT_ID, EASE, PANEL_DURATION } from "./model";
 import { TouchscreenTabContent } from "./tabs/TouchscreenTabContent";
 
 export function TouchscreenDashboard() {
@@ -75,11 +75,20 @@ export function TouchscreenDashboard() {
       el.style.right = `${540 - delta}px`;
     },
     onReset: () => {
-      const el = activeOverlayRef.current;
-      if (!el) return;
-      // Set explicit value — clearing to "" would leave React's vDOM out of sync,
-      // causing it to never re-apply the value and the element to collapse.
-      el.style.right = "540px";
+      // resetElement() cleared the panel's inline transition; React won't re-apply
+      // it (vDOM unchanged), so tap-to-close would have no animation. Restore it.
+      const panelEl = panelSwipeRef.current;
+      if (panelEl) {
+        panelEl.style.transition = `width ${PANEL_DURATION} ${EASE}, box-shadow ${PANEL_DURATION} ${EASE}`;
+        panelEl.style.willChange = "width";
+      }
+      // Restore overlay to its correct position. Setting "" would leave React's
+      // vDOM out of sync (it won't re-apply since the value looks unchanged).
+      const overlayEl = activeOverlayRef.current;
+      if (overlayEl) {
+        overlayEl.style.transition = `right ${PANEL_DURATION} ${EASE}`;
+        overlayEl.style.right = `${openRightPanel ? 540 : 84}px`;
+      }
     },
   });
 
