@@ -77,8 +77,9 @@ export function TouchscreenDashboard() {
     onReset: () => {
       const el = activeOverlayRef.current;
       if (!el) return;
-      el.style.transition = "";
-      el.style.right = "";
+      // Set explicit value — clearing to "" would leave React's vDOM out of sync,
+      // causing it to never re-apply the value and the element to collapse.
+      el.style.right = "540px";
     },
   });
 
