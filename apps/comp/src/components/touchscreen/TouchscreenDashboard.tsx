@@ -76,18 +76,14 @@ export function TouchscreenDashboard() {
     },
     onReset: () => {
       // resetElement() cleared the panel's inline transition; React won't re-apply
-      // it (vDOM unchanged), so tap-to-close would have no animation. Restore it.
+      // it (vDOM unchanged), so future tap-to-close would have no animation. Restore it.
+      // Do NOT touch the overlay here — onProgress(0/456, true) already set it to the
+      // correct right value. Reading openRightPanel in a stale closure would set the
+      // wrong value and trigger a spurious re-animation.
       const panelEl = panelSwipeRef.current;
       if (panelEl) {
         panelEl.style.transition = `width ${PANEL_DURATION} ${EASE}, box-shadow ${PANEL_DURATION} ${EASE}`;
         panelEl.style.willChange = "width";
-      }
-      // Restore overlay to its correct position. Setting "" would leave React's
-      // vDOM out of sync (it won't re-apply since the value looks unchanged).
-      const overlayEl = activeOverlayRef.current;
-      if (overlayEl) {
-        overlayEl.style.transition = `right ${PANEL_DURATION} ${EASE}`;
-        overlayEl.style.right = `${openRightPanel ? 540 : 84}px`;
       }
     },
   });
