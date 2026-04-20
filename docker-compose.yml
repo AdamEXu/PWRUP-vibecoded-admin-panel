@@ -1,0 +1,10 @@
+# docker-compose.yml
+services:
+  web:
+    build: .
+    ports:
+      - "7070:7070"
+    environment:
+      - NODE_ENV=production
+      - PORT=7070
+      - HOSTNAME=0.0.0.0

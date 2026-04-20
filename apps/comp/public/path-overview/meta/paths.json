@@ -1,0 +1,41 @@
+{
+    "Ball Shooter Left": {
+        "name": "Ball Shooter Left",
+        "description": "Goes through left trench and picks up fuel from neutral zone, shooting back to alliance area",
+        "preview": "/path-overview/animated/Ball Shooter Left.gif"
+    },
+    "Ball Shooter Right": {
+        "name": "Ball Shooter Right",
+        "description": "Goes through right trench and picks up fuel from neutral zone, shooting back to alliance area",
+        "preview": "/path-overview/animated/Ball Shooter Right.gif"
+    },
+    "Climber Left": {
+        "name": "Climber Left to Left",
+        "description": "From left side of alliance area, goes to the left side of the tower and climbs",
+        "preview": "/path-overview/animated/Climber Left.gif"
+    },
+    "Climber Middle": {
+        "name": "Climber Middle to Left",
+        "description": "From middle of alliance area, goes to the left side of the tower and climbs",
+        "preview": "/path-overview/animated/Climber Middle.gif"
+    },
+    "Climber Right Left": {
+        "name": "Climber Left to Right",
+        "description": "From left side of alliance area, goes to the right side of the tower and climbs",
+        "preview": "/path-overview/animated/Climber Right Left.gif"
+    },
+    "Climber Right Middle": {
+        "name": "Climber Middle to Right",
+        "description": "From middle of alliance area, goes to the right side of the tower and climbs",
+        "preview": "/path-overview/animated/Climber Right Middle.gif"
+    },
+    "Climber Right Right": {
+        "name": "Climber Right to Right",
+        "description": "From right side of alliance area, goes to the right side of the tower and climbs",
+        "preview": "/path-overview/animated/Climber Right Right.gif"
+    },
+    "Stay And Shoot": {
+        "name": "Stay And Shoot",
+        "description": "Stays at starting position and shoots initial fuel payload into the hub"
+    }
+}

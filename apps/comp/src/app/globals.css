@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/* ─── Fonts ──────────────────────────────────────────────────────────────────
+   Roboto Mono: used for the match timer display.
+   Place RobotoMono-Regular.woff2 in apps/comp/public/fonts/ for offline use.
+
+   SF Pro / SF Symbols: used for hub status icons.
+   Place SF-Pro.otf (or SF-Pro-Display-Regular.otf) in apps/comp/public/fonts/.
+   The file is internal-use only (not distributed commercially).
+*/
+
+@font-face {
+  font-family: "Roboto Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local("Roboto Mono"), local("RobotoMono-Regular"),
+    url("/fonts/RobotoMono-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "SF Pro";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/SF-Pro.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local("Inter"), local("Inter Regular");
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    color: #fff;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* Prevent any scrollbars on the HUD display */
+    overflow: hidden;
+  }
+}
+
+/* ─── SF Symbol helper class ─────────────────────────────────────────────── */
+.sf-symbol {
+  font-family: "SF Pro", sans-serif;
+  font-variant-ligatures: none;
+  font-variation-settings: "wdth" 100;
+  line-height: 1;
+  display: inline-block;
+}
+
+/* ─── Hub warning pulse animation ────────────────────────────────────────── */
+@keyframes hub-warning-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.animate-hub-warning {
+  animation: hub-warning-pulse 0.7s ease-in-out infinite;
+}
+
+/* ─── NT disconnected pulse ─────────────────────────────────────────────── */
+@keyframes nt-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.animate-nt-pulse {
+  animation: nt-pulse 1.4s ease-in-out infinite;
+}
+
+/* ─── Touchscreen overlay / dock animations ──────────────────────────────── */
+@keyframes ts-slide-up {
+  from { transform: translate3d(0, 100%, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+@keyframes ts-slide-down {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, 100%, 0); }
+}
+@keyframes ts-slide-in-right {
+  from { transform: translate3d(100%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+@keyframes ts-dock-up {
+  from { transform: translate3d(0, 100%, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+@keyframes ts-dock-down {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, 100%, 0); }
+}
+
+.animate-ts-slide-up {
+  animation: ts-slide-up 200ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  backface-visibility: hidden;
+}
+.animate-ts-slide-down {
+  animation: ts-slide-down 200ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  backface-visibility: hidden;
+}
+.animate-ts-dock-up {
+  animation: ts-dock-up 100ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  backface-visibility: hidden;
+}
+.animate-ts-dock-down {
+  animation: ts-dock-down 100ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  backface-visibility: hidden;
+}

@@ -20,6 +20,65 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Docker
+
+Build and run the production container:
+
+```bash
+docker build -t blitz-renderer .
+docker run -d --rm -p 7070:7070 --name blitz-renderer blitz-renderer
+```
+
+The `-d` flag runs the container in detached mode (background), so you can continue using your terminal.
+
+To stop the container:
+```bash
+docker stop blitz-renderer
+```
+
+To view logs:
+```bash
+docker logs blitz-renderer
+```
+
+Or with Compose (also runs in detached mode):
+```bash
+docker compose up -d --build
+```
+
+Access the app at [http://localhost:7070](http://localhost:7070)
+
+## Electron App Builds
+
+The web app and Electron app are separate flows. Existing web scripts (`npm run dev`, `npm run build`, `npm run start`) still work as-is.
+
+### Electron development
+
+```bash
+npm run electron:dev
+```
+
+This runs Next.js in dev mode and launches Electron against `http://127.0.0.1:3000`.
+
+### Windows x86-64 build (unpacked app folder)
+
+```bash
+npm run electron:build:win
+```
+
+This generates:
+- `build/icons/icon.ico` and `build/icons/icon.png`
+- a production Next.js build
+- `dist-electron/win-unpacked/Blitz Renderer.exe` (Windows x64 app)
+
+### Windows x86-64 installer/distributable
+
+```bash
+npm run electron:dist:win
+```
+
+This generates installer artifacts in `dist-electron/` (for example NSIS and portable `.exe` outputs).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

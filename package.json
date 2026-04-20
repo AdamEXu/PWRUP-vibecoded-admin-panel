@@ -1,33 +1,29 @@
 {
-  "name": "blitz-renderer",
-  "version": "0.1.0",
+  "name": "pwrup-workspace",
   "private": true,
+  "version": "0.1.0",
+  "description": "PWRUP admin + comp workspace",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "gen:proto": "protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/generated --ts_proto_opt=esModuleInterop=true,forceLong=string,useOptionals=messages,outputServices=generic-definitions -I src/proto src/proto/**/*.proto"
-  },
-  "dependencies": {
-    "@types/recharts": "^1.8.29",
-    "autobahn-client": "^0.1.0",
-    "next": "15.3.3",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "recharts": "^2.15.3"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "15.3.3",
-    "patch-package": "^8.0.1",
-    "tailwindcss": "^4",
-    "ts-proto": "^2.7.5",
-    "typescript": "^5"
+    "dev:admin": "pnpm --filter @pwrup/admin dev",
+    "dev:comp": "pnpm --filter @pwrup/comp dev",
+    "dev:debug": "pnpm --filter @pwrup/debug dev",
+    "renderer:comp": "pnpm --filter @pwrup/comp dev:renderer",
+    "renderbuild:comp": "pnpm --filter @pwrup/comp build:renderer",
+    "renderstart:comp": "pnpm --filter @pwrup/comp start:renderer",
+    "sync:pathplanner:dry": "./scripts/sync-pathplanner-from-fir.sh",
+    "sync:pathplanner": "./scripts/sync-pathplanner-from-fir.sh --apply",
+    "sync:autos:dry": "./scripts/sync-pathplanner-from-fir.sh --autos-only",
+    "sync:autos": "./scripts/sync-pathplanner-from-fir.sh --apply --autos-only",
+    "build:admin": "pnpm --filter @pwrup/admin build",
+    "build:comp": "pnpm --filter @pwrup/comp build",
+    "build:debug": "pnpm --filter @pwrup/debug build",
+    "dist:admin": "pnpm --filter @pwrup/admin dist",
+    "dist:comp": "pnpm --filter @pwrup/comp dist",
+    "dist:debug": "pnpm --filter @pwrup/debug dist",
+    "start:admin": "pnpm --filter @pwrup/admin start",
+    "start:comp": "pnpm --filter @pwrup/comp start",
+    "start:debug": "pnpm --filter @pwrup/debug start",
+    "build:all": "pnpm -r --filter @pwrup/admin --filter @pwrup/comp --filter @pwrup/debug build",
+    "dist:all": "pnpm -r --filter @pwrup/admin --filter @pwrup/comp --filter @pwrup/debug dist"
   }
 }

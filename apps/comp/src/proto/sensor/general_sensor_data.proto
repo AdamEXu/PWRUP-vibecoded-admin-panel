@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+import "sensor/apriltags.proto";
+import "sensor/odometry.proto";
+import "sensor/camera_sensor.proto";
+import "sensor/imu.proto";
+import "sensor/lidar.proto";
+
+package proto.sensor;
+
+enum SensorName {
+    APRIL_TAGS = 0;
+    ODOMETRY = 1;
+    IMU = 2;
+    LIDAR = 3;
+    CAMERA = 4;
+}
+
+message GeneralSensorData {
+    SensorName sensor_name = 1;
+    string sensor_id = 2;
+    int64 timestamp = 3;
+    int64 processing_time_ms = 4;
+    oneof data {
+        sensor.AprilTagData apriltags = 5;
+        sensor.OdometryData odometry = 6;
+        sensor.ImageData image = 7;
+        sensor.LidarData lidar = 8;
+        sensor.ImuData imu = 9;
+    }
+}

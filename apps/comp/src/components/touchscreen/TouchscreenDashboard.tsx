@@ -1,0 +1,194 @@
+"use client";
+
+import { DndContext, DragOverlay } from "@dnd-kit/core";
+import { useCallback, useRef, useState } from "react";
+import { ConnectionLost } from "../match/ConnectionLost";
+import { LeftRail } from "./components/chrome/LeftRail";
+import { RightPanel } from "./components/chrome/RightPanel";
+import dynamic from "next/dynamic";
+
+const DriverTab = dynamic(
+  () => import("./tabs/DriverTab").then((m) => m.DriverTab),
+  { ssr: false, loading: () => <div className="h-full w-full bg-black" /> },
+);
+import { TouchscreenDragGhost } from "./components/dnd/TouchscreenDragGhost";
+import { DockDrawer } from "./components/dock/DockDrawer";
+import { useTouchscreenDnd } from "./hooks/useTouchscreenDnd";
+import { useSwipeGesture } from "./hooks/useSwipeGesture";
+import { useTouchscreenLayoutState } from "./hooks/useTouchscreenLayoutState";
+import { usePathNetworkTable } from "@/lib/hooks/usePathNetworkTable";
+import { TOUCHSCREEN_DND_CONTEXT_ID, EASE, PANEL_DURATION } from "./model";
+import { TouchscreenTabContent } from "./tabs/TouchscreenTabContent";
+
+export function TouchscreenDashboard() {
+  const { isConnected } = usePathNetworkTable();
+  const {
+    activeOverlayTab,
+    appLayerStyle,
+    clearPrevOverlayTab,
+    closeDock,
+    closePanelImmediate,
+    dismissOverlay,
+    dismissOverlayImmediate,
+    displayPanelId,
+    dockIcons,
+    driverLayerStyle,
+    isDockClosing,
+    isDockOpen,
+    isDriverBase,
+    leftRailIcons,
+    onDockCloseAnimEnd,
+    openFromDock,
+    openRightPanel,
+    prevOverlayTab,
+    rightPanelStyle,
+    setDockIcons,
+    setLeftRailIcons,
+    switchOverlayTab,
+    toggleDock,
+    togglePanel,
+    useOverlayRightPanel,
+  } = useTouchscreenLayoutState();
+
+  // Track whether the entry animation has finished so we can hand off to gesture transform
+  const [entryAnimDone, setEntryAnimDone] = useState(false);
+  const onEntryAnimEnd = useCallback(() => setEntryAnimDone(true), []);
+  // Reset when active tab changes
+  const [lastTab, setLastTab] = useState(activeOverlayTab);
+  if (activeOverlayTab !== lastTab) {
+    setLastTab(activeOverlayTab);
+    if (activeOverlayTab !== null) setEntryAnimDone(false);
+  }
+
+  const activeOverlayRef = useRef<HTMLDivElement>(null);
+
+  const { ref: panelSwipeRef } = useSwipeGesture({
+    direction: "right",
+    dimension: 456, // content width (540 - 84), icon column stays at screen edge
+    onCommit: closePanelImmediate,
+    enabled: openRightPanel !== null,
+    resetOnCommit: true,
+    onProgress: (delta, animated) => {
+      const el = activeOverlayRef.current;
+      if (!el) return;
+      el.style.transition = animated ? "right 200ms cubic-bezier(0.25, 0.1, 0.25, 1)" : "none";
+      el.style.right = `${540 - delta}px`;
+    },
+    onReset: () => {
+      // resetElement() cleared the panel's inline transition; React won't re-apply
+      // it (vDOM unchanged), so future tap-to-close would have no animation. Restore it.
+      // Do NOT touch the overlay here — onProgress(0/456, true) already set it to the
+      // correct right value. Reading openRightPanel in a stale closure would set the
+      // wrong value and trigger a spurious re-animation.
+      const panelEl = panelSwipeRef.current;
+      if (panelEl) {
+        panelEl.style.transition = `width ${PANEL_DURATION} ${EASE}, box-shadow ${PANEL_DURATION} ${EASE}`;
+        panelEl.style.willChange = "width";
+      }
+    },
+  });
+
+  const { ref: swipeDownRef } = useSwipeGesture({
+    direction: "down",
+    dimension: typeof window !== "undefined" ? window.innerHeight : 800,
+    onCommit: dismissOverlayImmediate,
+    enabled: activeOverlayTab !== null && entryAnimDone,
+  });
+
+  const { collisionDetection, draggingTabDef, handleDragCancel, handleDragEnd, handleDragStart, sensors } = useTouchscreenDnd({
+    leftRailIcons,
+    setLeftRailIcons,
+    dockIcons,
+    setDockIcons,
+  });
+
+  return (
+    <DndContext
+      id={TOUCHSCREEN_DND_CONTEXT_ID}
+      sensors={sensors}
+      collisionDetection={collisionDetection}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="fixed top-0 bottom-0 z-0 bg-black" style={driverLayerStyle}>
+        <DriverTab isActive={isDriverBase} />
+      </div>
+
+      {prevOverlayTab !== null && (
+        <div
+          key={`exit-${prevOverlayTab}`}
+          className="fixed top-0 bottom-0 z-10 bg-black animate-ts-slide-down will-change-transform"
+          style={appLayerStyle}
+          onAnimationEnd={clearPrevOverlayTab}
+        >
+          <TouchscreenTabContent tabId={prevOverlayTab} />
+        </div>
+      )}
+
+      {activeOverlayTab !== null && (
+        <div
+          ref={(el) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (swipeDownRef as any).current = el;
+            activeOverlayRef.current = el;
+          }}
+          key={`enter-${activeOverlayTab}`}
+          className={[
+            "fixed top-0 bottom-0 z-10 bg-black will-change-transform",
+            !entryAnimDone && "animate-ts-slide-up",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          style={
+            entryAnimDone
+              ? { ...appLayerStyle, transform: "translate3d(0, 0, 0)" }
+              : appLayerStyle
+          }
+          onAnimationEnd={onEntryAnimEnd}
+        >
+          <TouchscreenTabContent tabId={activeOverlayTab} />
+        </div>
+      )}
+
+      <LeftRail
+        leftRailIcons={leftRailIcons}
+        activeOverlayTab={activeOverlayTab}
+        isDriverBase={isDriverBase}
+        isDockOpen={isDockOpen}
+        onDismissOverlay={dismissOverlay}
+        onSwitchOverlayTab={switchOverlayTab}
+        onToggleDock={toggleDock}
+      />
+
+      <RightPanel
+        useOverlayRightPanel={useOverlayRightPanel}
+        openPanel={openRightPanel}
+        displayPanel={displayPanelId}
+        onToggle={togglePanel}
+        swipeRef={panelSwipeRef}
+        style={rightPanelStyle}
+      />
+
+      {isDockOpen && !isDockClosing && (
+        <div className="fixed inset-0 z-[19]" onClick={closeDock} />
+      )}
+
+      {isDockOpen && (
+        <DockDrawer
+          availableIcons={dockIcons}
+          activeTabId={activeOverlayTab}
+          closing={isDockClosing}
+          onOpen={openFromDock}
+          onCloseAnimEnd={onDockCloseAnimEnd}
+        />
+      )}
+
+      <DragOverlay>
+        <TouchscreenDragGhost symbol={draggingTabDef?.symbol} />
+      </DragOverlay>
+
+      <ConnectionLost visible={!isConnected} />
+    </DndContext>
+  );
+}
