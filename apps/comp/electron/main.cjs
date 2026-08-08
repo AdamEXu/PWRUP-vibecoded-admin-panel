@@ -1,11 +1,21 @@
-const { app, BrowserWindow, dialog, ipcMain, screen } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  screen,
+  session,
+  systemPreferences,
+} = require("electron");
 const { spawn } = require("child_process");
+const { promises: fsp } = require("fs");
 const http = require("http");
 const net = require("net");
 const path = require("path");
 const { SharedSettingsManager } = require("./shared-settings.cjs");
 const { NtBroker } = require("./nt-broker.cjs");
 const { AutobahnBroker } = require("./autobahn-broker.cjs");
+const { NtRecorder } = require("./nt-recorder.cjs");
 
 const HOST = "127.0.0.1";
 const DEFAULT_DEV_URL = "http://127.0.0.1:3001";
@@ -28,6 +38,52 @@ const settingsManager = new SharedSettingsManager();
 const ntBroker = new NtBroker();
 const autobahnBroker = new AutobahnBroker();
 const trackedRendererIds = new Set();
+
+// The recorder needs app.getPath(), so it is constructed once the app is ready.
+let ntRecorder = null;
+
+function getRecorderPrefsPath() {
+  return path.join(app.getPath("userData"), "recorder-prefs.json");
+}
+
+function getDefaultRecordingsDir() {
+  return path.join(app.getPath("userData"), "recordings");
+}
+
+async function readRecorderPrefs() {
+  try {
+    const raw = await fsp.readFile(getRecorderPrefsPath(), "utf8");
+    const parsed = JSON.parse(raw);
+    return {
+      recordingsDir:
+        typeof parsed?.recordingsDir === "string" && parsed.recordingsDir.trim().length > 0
+          ? parsed.recordingsDir
+          : getDefaultRecordingsDir(),
+      autoRecord: parsed?.autoRecord === true,
+    };
+  } catch {
+    return { recordingsDir: getDefaultRecordingsDir(), autoRecord: false };
+  }
+}
+
+async function writeRecorderPrefs(prefs) {
+  const filePath = getRecorderPrefsPath();
+  try {
+    await fsp.mkdir(path.dirname(filePath), { recursive: true });
+    await fsp.writeFile(filePath, JSON.stringify(prefs, null, 2), "utf8");
+  } catch (error) {
+    console.error("[recorder] failed to persist prefs:", error?.message ?? error);
+  }
+}
+
+async function persistRecorderPrefsFromStatus() {
+  if (!ntRecorder) return;
+  const status = ntRecorder.getStatus();
+  await writeRecorderPrefs({
+    recordingsDir: status.recordingsDir,
+    autoRecord: status.autoRecord,
+  });
+}
 
 function pushServerLog(source, chunk) {
   const text = String(chunk ?? "").replace(/\r/g, "");
@@ -248,12 +304,75 @@ function registerIpcHandlers() {
   });
   ipcMain.handle("blitz:autobahn:publish", (_event, params) => autobahnBroker.publish(params));
   ipcMain.handle("blitz:autobahn:reconnect", () => autobahnBroker.reconnect());
+
+  ipcMain.handle("blitz:recorder:get-status", () => ntRecorder.getStatus());
+  ipcMain.handle("blitz:recorder:start", (_event, options) => ntRecorder.start(options ?? {}));
+  ipcMain.handle("blitz:recorder:stop", () => ntRecorder.stop());
+  ipcMain.handle("blitz:recorder:list-sessions", () => ntRecorder.listSessions());
+  ipcMain.handle("blitz:recorder:delete-session", (_event, id) => ntRecorder.deleteSession(id));
+  ipcMain.handle("blitz:recorder:reveal-session", (_event, id) => ntRecorder.revealSession(id));
+  ipcMain.handle("blitz:recorder:set-auto-record", async (_event, enabled) => {
+    ntRecorder.setAutoRecord(enabled === true);
+    await persistRecorderPrefsFromStatus();
+    return ntRecorder.getStatus();
+  });
+  ipcMain.handle("blitz:recorder:choose-dir", async (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(owner ?? undefined, {
+      title: "Choose where recordings are saved",
+      defaultPath: ntRecorder.getStatus().recordingsDir,
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+    return result.filePaths[0];
+  });
+  ipcMain.handle("blitz:recorder:set-dir", async (_event, dir) => {
+    ntRecorder.setRecordingsDir(dir);
+    await persistRecorderPrefsFromStatus();
+    return ntRecorder.getStatus();
+  });
+  ipcMain.handle("blitz:recorder:begin-video", (_event, info) => ntRecorder.beginVideo(info));
+  ipcMain.handle("blitz:recorder:append-video", (_event, chunk) =>
+    ntRecorder.appendVideoChunk(chunk),
+  );
+  ipcMain.handle("blitz:recorder:end-video", () => ntRecorder.endVideo());
+}
+
+/**
+ * The Record app captures a field-facing webcam. Electron denies `media` unless we say
+ * otherwise, and macOS additionally needs an OS-level camera grant before device labels
+ * (let alone frames) are available.
+ */
+async function configureMediaPermissions() {
+  session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => {
+    callback(permission === "media");
+  });
+  session.defaultSession.setPermissionCheckHandler((_contents, permission) => permission === "media");
+
+  if (process.platform === "darwin") {
+    try {
+      await systemPreferences.askForMediaAccess("camera");
+    } catch (error) {
+      console.error("[recorder] camera access request failed:", error?.message ?? error);
+    }
+  }
 }
 
 async function initializeBridge() {
   const snapshot = await settingsManager.initialize();
   ntBroker.initialize(snapshot);
   autobahnBroker.initialize(snapshot);
+
+  const recorderPrefs = await readRecorderPrefs();
+  ntRecorder = new NtRecorder({
+    settingsManager,
+    recordingsDir: recorderPrefs.recordingsDir,
+  });
+  ntRecorder.setAutoRecord(recorderPrefs.autoRecord);
+  // NtRecorder subscribes to settingsManager "change" itself, so it is not rebound here.
+  ntRecorder.initialize();
 
   settingsManager.on("change", (nextSnapshot) => {
     ntBroker.updateSettingsSnapshot(nextSnapshot);
@@ -265,6 +384,11 @@ async function initializeBridge() {
     broadcastToWindows("blitz:autobahn:status", isConnected);
   });
 
+  ntRecorder.on("status", (status) => {
+    broadcastToWindows("blitz:recorder:status", status);
+  });
+
+  await configureMediaPermissions();
   registerIpcHandlers();
 }
 
@@ -407,7 +531,24 @@ async function createWindows() {
   }
 }
 
-app.on("before-quit", () => {
+let recorderShutdownPromise = null;
+
+app.on("before-quit", (event) => {
+  // An in-flight recording still has buffered samples; quitting synchronously would truncate
+  // the log. Defer the quit exactly once while the recorder closes its files.
+  if (ntRecorder && !recorderShutdownPromise) {
+    event.preventDefault();
+    recorderShutdownPromise = Promise.resolve()
+      .then(() => ntRecorder.shutdown())
+      .catch((error) => {
+        console.error("[recorder] shutdown failed:", error?.message ?? error);
+      })
+      .then(() => {
+        app.quit();
+      });
+    return;
+  }
+
   app.isQuitting = true;
   settingsManager.stop();
   ntBroker.stop();
