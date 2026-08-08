@@ -135,4 +135,9 @@ contextBridge.exposeInMainWorld("blitzRenderer", {
     appendVideoChunk: (chunk) => ipcRenderer.invoke("blitz:recorder:append-video", chunk),
     endVideo: () => ipcRenderer.invoke("blitz:recorder:end-video"),
   },
+  media: {
+    getCameraStatus: () => ipcRenderer.invoke("blitz:media:get-camera-status"),
+    requestCamera: () => ipcRenderer.invoke("blitz:media:request-camera"),
+    openCameraSettings: () => ipcRenderer.invoke("blitz:media:open-camera-settings"),
+  },
 });

@@ -71,3 +71,19 @@ export function getRecorderBridge(): RecorderBridge | null {
   const bridge = getBridge() as unknown as { recorder?: RecorderBridge };
   return bridge.recorder ?? null;
 }
+
+/** macOS TCC state for the camera. Platforms without TCC always report "granted". */
+export type CameraAccessStatus = "not-determined" | "granted" | "denied" | "restricted" | "unknown";
+
+export interface MediaBridge {
+  getCameraStatus: () => Promise<CameraAccessStatus>;
+  /** Raises the OS prompt while the grant is undecided; resolves to the settled status. */
+  requestCamera: () => Promise<CameraAccessStatus>;
+  openCameraSettings: () => Promise<void>;
+}
+
+export function getMediaBridge(): MediaBridge | null {
+  if (!hasBridge()) return null;
+  const bridge = getBridge() as unknown as { media?: MediaBridge };
+  return bridge.media ?? null;
+}

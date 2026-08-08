@@ -5,6 +5,7 @@ const {
   ipcMain,
   screen,
   session,
+  shell,
   systemPreferences,
 } = require("electron");
 const { spawn } = require("child_process");
@@ -338,26 +339,53 @@ function registerIpcHandlers() {
     ntRecorder.appendVideoChunk(chunk),
   );
   ipcMain.handle("blitz:recorder:end-video", () => ntRecorder.endVideo());
+
+  ipcMain.handle("blitz:media:get-camera-status", () => getCameraAccessStatus());
+  ipcMain.handle("blitz:media:request-camera", () => requestCameraAccess());
+  ipcMain.handle("blitz:media:open-camera-settings", async () => {
+    if (process.platform !== "darwin") return;
+    await shell.openExternal(
+      "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera",
+    );
+  });
 }
 
 /**
- * The Record app captures a field-facing webcam. Electron denies `media` unless we say
- * otherwise, and macOS additionally needs an OS-level camera grant before device labels
- * (let alone frames) are available.
+ * The Record app captures a field-facing webcam, which Electron denies unless we say
+ * otherwise. macOS gates it a second time behind TCC; that prompt is raised on demand
+ * (see `blitz:media:request-camera`) rather than here, because askForMediaAccess blocks
+ * until the user answers and a prompt fired before any window exists has nothing on
+ * screen to explain it.
  */
-async function configureMediaPermissions() {
+function configureMediaPermissions() {
   session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => {
     callback(permission === "media");
   });
   session.defaultSession.setPermissionCheckHandler((_contents, permission) => permission === "media");
+}
 
-  if (process.platform === "darwin") {
-    try {
-      await systemPreferences.askForMediaAccess("camera");
-    } catch (error) {
-      console.error("[recorder] camera access request failed:", error?.message ?? error);
-    }
+/** Mirrors Electron's media-access vocabulary; platforms without TCC are always granted. */
+function getCameraAccessStatus() {
+  return process.platform === "darwin"
+    ? systemPreferences.getMediaAccessStatus("camera")
+    : "granted";
+}
+
+async function requestCameraAccess() {
+  if (process.platform !== "darwin" || getCameraAccessStatus() !== "not-determined") {
+    return getCameraAccessStatus();
   }
+
+  // Unsigned dev builds have their TCC request attributed to the launching terminal, so
+  // the prompt carries that app's name. Focusing first at least puts it in front of the
+  // window the user just clicked.
+  app.focus({ steal: true });
+  try {
+    await systemPreferences.askForMediaAccess("camera");
+  } catch (error) {
+    console.error("[recorder] camera access request failed:", error?.message ?? error);
+  }
+  return getCameraAccessStatus();
 }
 
 async function initializeBridge() {
@@ -388,7 +416,7 @@ async function initializeBridge() {
     broadcastToWindows("blitz:recorder:status", status);
   });
 
-  await configureMediaPermissions();
+  configureMediaPermissions();
   registerIpcHandlers();
 }
 

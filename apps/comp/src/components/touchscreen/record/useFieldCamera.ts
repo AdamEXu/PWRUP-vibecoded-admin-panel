@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { syncPreviewElement } from "./logic";
+import { getMediaBridge, type CameraAccessStatus } from "./types";
 
 export const FIELD_CAMERA_STORAGE_KEY = "pwrup.touchscreen.record.camera.v1";
 
@@ -17,6 +18,9 @@ const PREFERRED_MIME_TYPES = [
 ];
 
 const DEVICE_MISSING_ERROR = "Selected camera is not connected.";
+
+export const CAMERA_BLOCKED_ERROR =
+  "The system is blocking camera access for this app. Grant it under Privacy & Security › Camera.";
 
 export interface FieldCameraDevice {
   deviceId: string;
@@ -45,6 +49,8 @@ export interface FieldCameraControls {
    * shows live video immediately.
    */
   attachPreview(el: HTMLVideoElement | null): void;
+  /** Opens the OS privacy pane; only meaningful while `error` is CAMERA_BLOCKED_ERROR. */
+  openCameraSettings(): void;
 }
 
 /**
@@ -183,6 +189,28 @@ function describeMediaError(error: unknown): string {
   return "Camera failed to start.";
 }
 
+/**
+ * macOS gates the camera behind TCC before Chromium ever sees the request, and an
+ * undecided grant makes getUserMedia fail rather than prompt. Settling it here — driven
+ * by an explicit user action, with a window on screen — is what puts the OS prompt in
+ * front of the user instead of behind a launcher they weren't looking at.
+ */
+async function ensureCameraAccess(): Promise<CameraAccessStatus> {
+  const media = getMediaBridge();
+  if (!media) {
+    return "granted";
+  }
+  try {
+    return await media.requestCamera();
+  } catch {
+    return "unknown";
+  }
+}
+
+function isAccessBlocked(status: CameraAccessStatus): boolean {
+  return status === "denied" || status === "restricted";
+}
+
 function stopStream(stream: MediaStream | null) {
   if (!stream) {
     return;
@@ -303,6 +331,13 @@ export function useFieldCamera(opts: { isRecording: boolean }): FieldCameraState
     if (labelsUnlockedRef.current || !detectSupport() || sessionRef.current) {
       return;
     }
+    if (isAccessBlocked(await ensureCameraAccess())) {
+      setEnabledState(false);
+      persist({ enabled: false });
+      safeSetState(setError, CAMERA_BLOCKED_ERROR);
+      return;
+    }
+
     let stream: MediaStream | null = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -451,6 +486,13 @@ export function useFieldCamera(opts: { isRecording: boolean }): FieldCameraState
         : { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
     };
 
+    if (isAccessBlocked(await ensureCameraAccess())) {
+      setEnabledState(false);
+      persist({ enabled: false });
+      safeSetState(setError, CAMERA_BLOCKED_ERROR);
+      return;
+    }
+
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -598,6 +640,10 @@ export function useFieldCamera(opts: { isRecording: boolean }): FieldCameraState
     }
   }, [persist, unlockLabels]);
 
+  const openCameraSettings = useCallback(() => {
+    void getMediaBridge()?.openCameraSettings().catch(() => {});
+  }, []);
+
   const selectDevice = useCallback((deviceId: string) => {
     selectedDeviceIdRef.current = deviceId;
     setSelectedDeviceId(deviceId);
@@ -617,5 +663,6 @@ export function useFieldCamera(opts: { isRecording: boolean }): FieldCameraState
     selectDevice,
     refreshDevices,
     attachPreview,
+    openCameraSettings,
   };
 }

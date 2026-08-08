@@ -2,6 +2,7 @@
 
 import { SettingsColumn } from "../settings/components/SettingsColumn";
 import { useFieldCameraContext } from "../record/FieldCameraProvider";
+import { CAMERA_BLOCKED_ERROR } from "../record/useFieldCamera";
 import { RecordControls } from "../record/RecordControls";
 import { SessionList } from "../record/SessionList";
 import { StatusReadout } from "../record/StatusReadout";
@@ -201,9 +202,18 @@ export function RecordTab() {
                   ) : null}
                 </div>
                 {camera.error ? (
-                  <p className="border-2 border-[#e5484d] bg-[#e5484d]/10 px-4 py-3 text-sm font-semibold text-[#e5484d]">
-                    {camera.error}
-                  </p>
+                  <div className="flex flex-col gap-2 border-2 border-[#e5484d] bg-[#e5484d]/10 px-4 py-3">
+                    <p className="text-sm font-semibold text-[#e5484d]">{camera.error}</p>
+                    {camera.error === CAMERA_BLOCKED_ERROR ? (
+                      <button
+                        type="button"
+                        onClick={camera.openCameraSettings}
+                        className="self-start border-2 border-[#e5484d] px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-[#e5484d]"
+                      >
+                        Open Privacy Settings
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
                 <div className="flex flex-col gap-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
