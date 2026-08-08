@@ -24,9 +24,6 @@
     "start:comp": "pnpm --filter @pwrup/comp start",
     "start:debug": "pnpm --filter @pwrup/debug start",
     "build:all": "pnpm -r --filter @pwrup/admin --filter @pwrup/comp --filter @pwrup/debug build",
-    "dist:all": "pnpm -r --filter @pwrup/admin --filter @pwrup/comp --filter @pwrup/debug dist",
-    "dev:demo": "pnpm --filter @pwrup/demo dev",
-    "build:demo": "pnpm --filter @pwrup/demo build",
-    "start:demo": "pnpm --filter @pwrup/demo start"
+    "dist:all": "pnpm -r --filter @pwrup/admin --filter @pwrup/comp --filter @pwrup/debug dist"
   }
 }
