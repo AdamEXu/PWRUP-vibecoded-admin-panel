@@ -12,6 +12,7 @@ export const ALL_TABS: TabDef[] = [
 
 export const RIGHT_PANELS: RightPanelDef[] = [
   { id: "showMap", label: "Map", symbol: "􀙊", activeSymbol: "􀙋" },
+  { id: "intakeSpeed", label: "Intake Speed", symbol: "􀥎", activeSymbol: "􀥏" },
   // { id: "showTimers", label: "Timers", symbol: "􀐯", activeSymbol: "􀐰" },
   // { id: "showStatus", label: "Status", symbol: "􀅴", activeSymbol: "􀅵" },
   // { id: "showCamera", label: "Camera", symbol: "􀌞", activeSymbol: "􀌟" },

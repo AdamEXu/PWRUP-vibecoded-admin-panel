@@ -7,7 +7,7 @@ export type OverlayTabId =
   | "visual"
   | "record";
 
-export type RightPanelId = "showMap" | "showTimers" | "showStatus" | "showCamera";
+export type RightPanelId = "showMap" | "intakeSpeed" | "showTimers" | "showStatus" | "showCamera";
 
 export interface TabDef {
   id: OverlayTabId;
